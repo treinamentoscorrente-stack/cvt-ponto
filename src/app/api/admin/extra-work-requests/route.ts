@@ -105,6 +105,6 @@ export async function PATCH(request:Request){
       throw e;
     }finally{client.release();}
   }catch{
-    return jsonError("Não foi possível analisar a solicitação de horas extras.",400);
+    return jsonError("Não foi possível analisar a solicitação de jornada extra.",400);
   }
 }
