@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { summariesForEmployee, aggregate } from "@/lib/ponto";
-import { extraMinutesForEmployee, extraSessionsForEmployee, totalsWithExtra } from "@/lib/extra-work";
+import { extraMinutesForEmployee, extraSessionsForEmployee } from "@/lib/extra-work";
 import { validMonth } from "@/lib/validation";
 import { jsonError } from "@/lib/http";
 
@@ -19,6 +19,19 @@ function hm(minutes:number){
   const sign=minutes<0?"-":"+";
   const a=Math.abs(minutes);
   return `${sign}${String(Math.floor(a/60)).padStart(2,"0")}h${String(a%60).padStart(2,"0")}`;
+}
+
+function reportTotals(base:ReturnType<typeof aggregate>,bankCredit:number){
+  const normalPositive=base.positive_minutes;
+  const totalPositive=normalPositive+bankCredit;
+  return {
+    ...base,
+    normal_positive_minutes:normalPositive,
+    bank_credit_minutes:bankCredit,
+    positive_minutes:totalPositive,
+    balance_minutes:totalPositive-base.negative_minutes,
+    extra_minutes:bankCredit,
+  };
 }
 
 export async function GET(request:Request){
@@ -82,7 +95,7 @@ export async function GET(request:Request){
       })
       .sort((a,b)=>a.date.localeCompare(b.date));
 
-    const totals=totalsWithExtra(aggregate(summaries),extraMinutes);
+    const totals=reportTotals(aggregate(summaries),extraMinutes);
     employeeReports.push({
       employee_id:id,
       employee_name:employee.name,
@@ -103,7 +116,7 @@ export async function GET(request:Request){
   return NextResponse.json({
     month,
     employee_label:raw==="ALL"?"Todos os funcionários":employees[0]?.name??"Funcionário",
-    totals:totalsWithExtra(aggregate(aggregateDays),aggregateExtra),
+    totals:reportTotals(aggregate(aggregateDays),aggregateExtra),
     rows:allRows,
     extra_rows:allExtraRows,
     employee_reports:employeeReports,
