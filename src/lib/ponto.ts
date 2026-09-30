@@ -22,6 +22,7 @@ export type DaySummary = {
   worked_minutes: number | null;
   expected_minutes: number | null;
   balance_minutes: number | null;
+  bank_debit_minutes: number;
   status: string;
   punch_count: number;
   occurrence_type: OccurrenceType | null;
@@ -65,9 +66,17 @@ export async function dailyExpected(date: string, occurrence?: DayOccurrence | n
   return base;
 }
 
+export async function bankDebitMinutes(date: string, occurrence?: DayOccurrence | null) {
+  if (occurrence?.occurrence_type !== "FOLGA") return 0;
+  const base = await baseExpected(date);
+  if (occurrence.period === "DIA_TODO") return base;
+  return Math.round(base / 2);
+}
+
 export function expectedPunchTypes(occurrence?: DayOccurrence | null): PunchType[] {
   if (occurrence?.occurrence_type === "FALTA" || occurrence?.occurrence_type === "ATESTADO") return [];
-  if (occurrence?.occurrence_type === "FOLGA" && occurrence.period !== "DIA_TODO") {
+  if (occurrence?.occurrence_type === "FOLGA") {
+    if (occurrence.period === "DIA_TODO") return [];
     return ["ENTRADA", "SAIDA"];
   }
   return [...TYPES];
@@ -118,13 +127,18 @@ export async function summarizeRows(
   const future = date > nowDate;
   const occurrenceLabel = labelOccurrence(occurrence);
   const expected = await dailyExpected(date, occurrence);
+  const bankDebit = await bankDebitMinutes(date, occurrence);
 
   let worked: number | null = null;
   let balance: number | null = null;
   let status = "SEM REGISTRO";
 
   if (future) {
-    if (occurrenceLabel) status = `${occurrenceLabel} — PROGRAMADA`;
+    if (occurrence?.occurrence_type === "FOLGA") {
+      worked = 0;
+      balance = -bankDebit;
+      status = `${occurrenceLabel} — PROGRAMADA — DÉBITO ${Math.round(bankDebit/60)}H`;
+    } else if (occurrenceLabel) status = `${occurrenceLabel} — PROGRAMADA`;
     else if (holidayDescription) status = "FERIADO";
   } else if (occurrence?.occurrence_type === "FALTA" && rows.length === 0) {
     worked = 0;
@@ -136,8 +150,8 @@ export async function summarizeRows(
     status = "ATESTADO";
   } else if (occurrence?.occurrence_type === "FOLGA" && occurrence.period === "DIA_TODO" && rows.length === 0) {
     worked = 0;
-    balance = 0;
-    status = "FOLGA";
+    balance = -bankDebit;
+    status = `FOLGA — DÉBITO ${Math.round(bankDebit/60)}H`;
   } else if (holidayDescription && rows.length === 0 && !occurrence) {
     worked = 0;
     balance = 0;
@@ -145,20 +159,17 @@ export async function summarizeRows(
   } else {
     worked = calcWorked(by, occurrence);
     if (worked !== null) {
-      balance = worked - expected;
+      balance = worked - expected - bankDebit;
       const result = outcome(balance);
       status = occurrenceLabel ? `${occurrenceLabel} — ${result}` : result;
     } else if (rows.length > 0) {
       const partial = date === nowDate ? "EM ANDAMENTO" : "JORNADA INCOMPLETA";
+      if (occurrence?.occurrence_type === "FOLGA") balance = -bankDebit;
       status = occurrenceLabel ? `${occurrenceLabel} — ${partial}` : partial;
     } else if (occurrence?.occurrence_type === "FOLGA" && occurrence.period !== "DIA_TODO") {
-      if (date === nowDate) {
-        status = `${occurrenceLabel} — EM ANDAMENTO`;
-      } else {
-        worked = 0;
-        balance = -expected;
-        status = `${occurrenceLabel} — NEGATIVO`;
-      }
+      worked = 0;
+      balance = -bankDebit;
+      status = `${occurrenceLabel} — DÉBITO ${Math.round(bankDebit/60)}H`;
     }
   }
 
@@ -171,6 +182,7 @@ export async function summarizeRows(
     worked_minutes: worked,
     expected_minutes: worked === null && !["FALTA","ATESTADO","FOLGA","FERIADO"].includes(status) && !status.includes("FOLGA ") ? null : expected,
     balance_minutes: balance,
+    bank_debit_minutes: bankDebit,
     status,
     punch_count: rows.length,
     occurrence_type: occurrence?.occurrence_type ?? null,
