@@ -26,14 +26,11 @@ export async function GET() {
   const now = saoPauloNow();
   const today = await summaryForDate(auth.session.userId, now.date);
   const nextType = await nextPunchType(auth.session.userId, now.date);
-  const currentExtra = extraSessions.find(s => s.open) ?? null;
-
   return NextResponse.json({
     employee: { id: Number(emp.id), name: emp.name, login: emp.login },
     server_time: new Date().toISOString(),
     today,
-    next_type: currentExtra ? null : nextType,
-    current_extra: currentExtra,
+    next_type: nextType,
     recent_extra: extraSessions.slice(0,10),
     totals: totalsWithExtra(aggregate(summaries), extraMinutes),
     recent: summaries.slice(0,10),

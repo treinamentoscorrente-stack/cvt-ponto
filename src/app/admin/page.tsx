@@ -10,7 +10,8 @@ type Report = { month:string; employee_label:string; totals:Totals; rows:Array<a
 type Occurrence = { id:number; employee_id:number; employee_name:string; work_date:string; occurrence_type:"FALTA"|"FOLGA"|"ATESTADO"; period:"DIA_TODO"|"MANHA"|"TARDE"; note:string|null };
 type Holiday = { id:number; holiday_date:string; description:string };
 type AdjustmentRequest = { id:number; employee_id:number; employee_name:string; work_date:string; requested_entrada:string|null; requested_intervalo_inicio:string|null; requested_intervalo_fim:string|null; requested_saida:string|null; reason:string; original_punches:Array<{punch_type:string;punch_time:string}>; status:"PENDENTE"|"APROVADO"|"REJEITADO"; review_note:string|null; created_at:string; reviewed_at:string|null };
-type View = "dashboard"|"employees"|"occurrences"|"adjustments"|"requests"|"holidays"|"report";
+type ExtraWorkRequest = { id:number; employee_id:number; employee_name:string; start_date:string; start_time:string; end_date:string; end_time:string; minutes:number; description:string; status:"PENDENTE"|"APROVADO"|"REJEITADO"; review_note:string|null; created_at:string; reviewed_at:string|null };
+type View = "dashboard"|"employees"|"occurrences"|"adjustments"|"requests"|"extraRequests"|"holidays"|"report";
 
 const emptyTotals:Totals = {worked_minutes:0,positive_minutes:0,negative_minutes:0,balance_minutes:0,pending:0,extra_minutes:0};
 const fmt=(n:number|null|undefined,s=false)=>{
@@ -75,6 +76,7 @@ export default function Admin(){
 
   const [holidays,setHolidays]=useState<Holiday[]>([]);
   const [adjustmentRequests,setAdjustmentRequests]=useState<AdjustmentRequest[]>([]);
+  const [extraWorkRequests,setExtraWorkRequests]=useState<ExtraWorkRequest[]>([]);
 
   const [adjustEmployee,setAdjustEmployee]=useState("");
   const [adjustDate,setAdjustDate]=useState(todaySP());
@@ -122,12 +124,18 @@ export default function Admin(){
     catch(e){setError(e instanceof Error?e.message:"Erro ao carregar solicitações.");}
   },[api]);
 
+  const loadExtraWorkRequests=useCallback(async()=>{
+    try{const d=await api("/api/admin/extra-work-requests");setExtraWorkRequests(d.requests||[]);}
+    catch(e){setError(e instanceof Error?e.message:"Erro ao carregar horas extras.");}
+  },[api]);
+
   useEffect(()=>{void loadBase();},[loadBase]);
   useEffect(()=>{
     if(view==="occurrences")void loadOccurrences();
     if(view==="requests")void loadAdjustmentRequests();
+    if(view==="extraRequests")void loadExtraWorkRequests();
     if(view==="holidays")void loadHolidays();
-  },[view,loadOccurrences,loadAdjustmentRequests,loadHolidays]);
+  },[view,loadOccurrences,loadAdjustmentRequests,loadExtraWorkRequests,loadHolidays]);
 
   async function logout(){
     await api("/api/auth/logout",{method:"POST",body:"{}"});
@@ -217,6 +225,23 @@ export default function Admin(){
     }catch(e){setError(e instanceof Error?e.message:"Erro ao analisar solicitação.");}
   }
 
+  async function reviewExtraWork(req:ExtraWorkRequest,decision:"APROVADO"|"REJEITADO"){
+    const action=decision==="APROVADO"?"aprovar":"rejeitar";
+    if(!window.confirm(`Deseja ${action} ${fmt(req.minutes)} de horas extras de ${req.employee_name}?`))return;
+    let reviewNote="";
+    if(decision==="REJEITADO"){
+      const typed=window.prompt("Motivo da rejeição (opcional):","");
+      if(typed===null)return;
+      reviewNote=typed.trim();
+    }
+    try{
+      setError("");setNotice("");
+      await api("/api/admin/extra-work-requests",{method:"PATCH",body:JSON.stringify({id:req.id,decision,review_note:reviewNote})});
+      await Promise.all([loadExtraWorkRequests(),loadBase()]);
+      setNotice(decision==="APROVADO"?"Horas extras aprovadas e adicionadas ao banco.":"Solicitação de horas extras rejeitada.");
+    }catch(e){setError(e instanceof Error?e.message:"Erro ao analisar horas extras.");}
+  }
+
   async function saveHoliday(e:FormEvent<HTMLFormElement>){
     e.preventDefault();setError("");setNotice("");
     const form=e.currentTarget;
@@ -302,7 +327,7 @@ export default function Admin(){
       <nav>
         {[
           ["dashboard","Dashboard"],["employees","Funcionários"],["occurrences","Ocorrências"],
-          ["adjustments","Ajuste de ponto"],["requests","Solicitações de ajuste"],["holidays","Feriados"],["report","Relatório mensal"]
+          ["adjustments","Ajuste de ponto"],["requests","Solicitações de ajuste"],["extraRequests","Horas extras"],["holidays","Feriados"],["report","Relatório mensal"]
         ].map(([k,l])=><button key={k} className={view===k?"active":""} onClick={()=>setView(k as View)}>{l}</button>)}
       </nav>
       <button className="logout" onClick={logout}>Sair</button>
@@ -399,6 +424,16 @@ export default function Admin(){
         </div>
         <div className="panel tableWrap"><table><thead><tr><th>Data</th><th>Funcionário</th><th>Ponto original</th><th>Solicitado</th><th>Motivo</th><th>Status</th><th>Ações</th></tr></thead>
           <tbody>{adjustmentRequests.length?adjustmentRequests.map(r=><tr key={r.id}><td>{formatDate(r.work_date)}</td><td>{r.employee_name}</td><td>{originalText(r.original_punches)}</td><td>{requestedText(r)}</td><td>{r.reason}</td><td>{r.status}{r.review_note?` — ${r.review_note}`:""}</td><td>{r.status==="PENDENTE"?<div className="reportActions"><button className="primary" onClick={()=>reviewAdjustmentRequest(r,"APROVADO")}>Aprovar</button><button className="secondary" onClick={()=>reviewAdjustmentRequest(r,"REJEITADO")}>Rejeitar</button></div>:"—"}</td></tr>):<tr><td colSpan={7}>Nenhuma solicitação encontrada.</td></tr>}</tbody>
+        </table></div>
+      </>}
+
+      {view==="extraRequests"&&<>
+        <div className="panel">
+          <div className="sectionHead"><div><p className="eyebrow">APROVAÇÃO</p><h2>Solicitações de horas extras</h2></div><span className="badge">{extraWorkRequests.filter(r=>r.status==="PENDENTE").length} pendente(s)</span></div>
+          <p className="serverNote">As horas só entram no banco de horas após aprovação. Solicitações pendentes não alteram o saldo.</p>
+        </div>
+        <div className="panel tableWrap"><table><thead><tr><th>Funcionário</th><th>Entrada</th><th>Saída</th><th>Duração</th><th>Referência</th><th>Status</th><th>Ações</th></tr></thead>
+          <tbody>{extraWorkRequests.length?extraWorkRequests.map(r=><tr key={r.id}><td>{r.employee_name}</td><td>{formatDate(r.start_date)} {String(r.start_time).slice(0,5)}</td><td>{formatDate(r.end_date)} {String(r.end_time).slice(0,5)}</td><td>{fmt(r.minutes)}</td><td>{r.description}</td><td>{r.status}{r.review_note?` — ${r.review_note}`:""}</td><td>{r.status==="PENDENTE"?<div className="reportActions"><button className="primary" onClick={()=>reviewExtraWork(r,"APROVADO")}>Aprovar</button><button className="secondary" onClick={()=>reviewExtraWork(r,"REJEITADO")}>Rejeitar</button></div>:"—"}</td></tr>):<tr><td colSpan={7}>Nenhuma solicitação de horas extras.</td></tr>}</tbody>
         </table></div>
       </>}
 

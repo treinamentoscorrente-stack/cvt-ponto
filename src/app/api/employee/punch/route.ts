@@ -32,15 +32,6 @@ export async function POST(request: Request) {
         return jsonError("Funcionário inativo.", 403);
       }
 
-      const extraOpen = await client.query(
-        "SELECT 1 FROM extra_work_sessions WHERE employee_id=$1 AND ended_at IS NULL LIMIT 1",
-        [auth.session.userId],
-      );
-      if (extraOpen.rowCount) {
-        await client.query("ROLLBACK");
-        return jsonError("Encerre a jornada extra antes de registrar o ponto normal.", 409);
-      }
-
       const occurrenceRow = (await client.query(
         `SELECT occurrence_type,period,note
          FROM attendance_occurrences WHERE employee_id=$1 AND work_date=$2`,
