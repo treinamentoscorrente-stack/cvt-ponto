@@ -1,2 +1,32 @@
-import { NextResponse } from "next/server";import { requireSession } from "@/lib/auth";import { db } from "@/lib/db";import { summariesForEmployee,aggregate } from "@/lib/ponto";import { saoPauloNow } from "@/lib/time";import { jsonError } from "@/lib/http";
-export const runtime="nodejs";export async function GET(){const a=await requireSession("employee");if(!a.ok)return jsonError(a.error,a.status);const emp=(await db.query(`SELECT id,name,login FROM employees WHERE id=$1`,[a.session.userId])).rows[0];const s=await summariesForEmployee(a.session.userId);const now=saoPauloNow();let today=s.find(v=>v.date===now.date);if(!today)today={date:now.date,entrada:null,intervalo_inicio:null,intervalo_fim:null,saida:null,worked_minutes:null,expected_minutes:null,balance_minutes:null,status:"SEM REGISTRO",punch_count:0};if(today.punch_count>0&&today.punch_count<4)today={...today,status:"EM ANDAMENTO"};const types=["ENTRADA","INTERVALO_INICIO","INTERVALO_FIM","SAIDA"];return NextResponse.json({employee:{id:Number(emp.id),name:emp.name,login:emp.login},server_time:new Date().toISOString(),today,next_type:today.punch_count<4?types[today.punch_count]:null,totals:aggregate(s),recent:s.slice(0,10)},{headers:{"cache-control":"no-store"}})}
+import { NextResponse } from "next/server";
+import { requireSession } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { summariesForEmployee, aggregate, summaryForDate, nextPunchType } from "@/lib/ponto";
+import { saoPauloNow } from "@/lib/time";
+import { jsonError } from "@/lib/http";
+
+export const runtime = "nodejs";
+
+export async function GET() {
+  const auth = await requireSession("employee");
+  if (!auth.ok) return jsonError(auth.error, auth.status);
+
+  const emp = (await db.query(
+    `SELECT id,name,login FROM employees WHERE id=$1`,
+    [auth.session.userId],
+  )).rows[0];
+
+  const summaries = await summariesForEmployee(auth.session.userId);
+  const now = saoPauloNow();
+  const today = await summaryForDate(auth.session.userId, now.date);
+  const nextType = await nextPunchType(auth.session.userId, now.date);
+
+  return NextResponse.json({
+    employee: { id: Number(emp.id), name: emp.name, login: emp.login },
+    server_time: new Date().toISOString(),
+    today,
+    next_type: nextType,
+    totals: aggregate(summaries),
+    recent: summaries.slice(0,10),
+  }, { headers: { "cache-control": "no-store" } });
+}
