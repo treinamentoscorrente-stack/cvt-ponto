@@ -7,17 +7,22 @@ const fmt=(n:number|null|undefined,s=false)=>{if(n==null)return"—";const sign=
 const formatDate=(value:string|null|undefined)=>{if(!value)return"—";const raw=String(value).slice(0,10);const m=raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?`${m[3]}/${m[2]}/${m[1]}`:value};
 const todaySP=()=>new Intl.DateTimeFormat("sv-SE",{timeZone:"America/Sao_Paulo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
 const statusLabel=(s:string)=>s==="PENDENTE"?"Pendente":s==="APROVADO"?"Aprovado":"Rejeitado";
-const extraEnd=(x:any)=>!x.end_time?"Em andamento":x.end_date&&x.end_date!==x.start_date?`${String(x.end_time).slice(0,5)} (${formatDate(x.end_date)})`:String(x.end_time).slice(0,5);
+const extraEnd=(x:any)=>x.end_date&&x.end_date!==x.start_date?`${String(x.end_time).slice(0,5)} (${formatDate(x.end_date)})`:String(x.end_time).slice(0,5);
 
 export default function Ponto(){
   const router=useRouter();
   const [data,setData]=useState<any>(null);
   const [requests,setRequests]=useState<any[]>([]);
+  const [extraRequests,setExtraRequests]=useState<any[]>([]);
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
   const [clock,setClock]=useState("00:00:00");
   const timer=useRef<any>(null);
 
+  const [extraStartDate,setExtraStartDate]=useState(todaySP());
+  const [extraStartTime,setExtraStartTime]=useState("");
+  const [extraEndDate,setExtraEndDate]=useState(todaySP());
+  const [extraEndTime,setExtraEndTime]=useState("");
   const [extraDescription,setExtraDescription]=useState("");
   const [extraBusy,setExtraBusy]=useState(false);
 
@@ -44,16 +49,25 @@ export default function Ponto(){
     setRequests(d.requests||[]);
   },[api]);
 
+  const loadExtraRequests=useCallback(async()=>{
+    const d=await api("/api/employee/extra-work");
+    setExtraRequests(d.requests||[]);
+  },[api]);
+
   const load=useCallback(async()=>{
     try{
-      const [d]=await Promise.all([api("/api/employee/dashboard"),loadRequests()]);
+      const [d]=await Promise.all([
+        api("/api/employee/dashboard"),
+        loadRequests(),
+        loadExtraRequests(),
+      ]);
       setData(d);
       const start=new Date(d.server_time).getTime(),local=Date.now();
       if(timer.current)clearInterval(timer.current);
       const tick=()=>setClock(new Intl.DateTimeFormat("pt-BR",{timeZone:"America/Sao_Paulo",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}).format(new Date(start+(Date.now()-local))));
       tick();timer.current=setInterval(tick,1000);
     }catch(e){setError(e instanceof Error?e.message:"Erro");}
-  },[api,loadRequests]);
+  },[api,loadRequests,loadExtraRequests]);
 
   useEffect(()=>{void load();return()=>{if(timer.current)clearInterval(timer.current)}},[load]);
 
@@ -62,19 +76,20 @@ export default function Ponto(){
     catch(e){setError(e instanceof Error?e.message:"Erro");}
   }
 
-  async function toggleExtra(){
+  async function requestExtra(e:FormEvent<HTMLFormElement>){
+    e.preventDefault();
     if(extraBusy)return;
     setExtraBusy(true);setError("");setNotice("");
     try{
-      const isOpen=!!data?.current_extra;
-      await api("/api/employee/extra-work",{method:"POST",body:JSON.stringify({
-        action:isOpen?"STOP":"START",
-        description:isOpen?"":extraDescription,
+      const result=await api("/api/employee/extra-work",{method:"POST",body:JSON.stringify({
+        start_date:extraStartDate,start_time:extraStartTime,
+        end_date:extraEndDate,end_time:extraEndTime,
+        description:extraDescription,
       })});
-      setNotice(isOpen?"Saída extra registrada. Horas adicionadas ao saldo positivo.":"Entrada extra registrada.");
-      if(!isOpen)setExtraDescription("");
-      await load();
-    }catch(e){setError(e instanceof Error?e.message:"Erro ao registrar jornada extra.");}
+      setNotice(`Horas extras enviadas para aprovação: ${fmt(result.minutes)}.`);
+      setExtraStartTime("");setExtraEndTime("");setExtraDescription("");
+      await loadExtraRequests();
+    }catch(e){setError(e instanceof Error?e.message:"Erro ao enviar horas extras.");}
     finally{setExtraBusy(false);}
   }
 
@@ -115,7 +130,6 @@ export default function Ponto(){
   }
 
   const blocked=["FALTA","ATESTADO"].includes(data?.today?.occurrence_type)||(data?.today?.occurrence_type==="FOLGA"&&data?.today?.occurrence_period==="DIA_TODO");
-  const extraOpen=!!data?.current_extra;
 
   return <main className="employeePage">
     <header className="employeeHeader">
@@ -127,8 +141,8 @@ export default function Ponto(){
       <p className="dateLine">Hora oficial do servidor</p>
       <div className="liveClock">{clock}</div>
       <p className="serverNote">America/Sao_Paulo</p>
-      <div className="nextPunch">{extraOpen?"Jornada extra em andamento. Encerre abaixo para voltar ao ponto normal.":blocked?`Ocorrência do dia: ${data?.today?.status}`:data?.next_type?`Próxima batida: ${LABEL[data.next_type]}`:"Jornada do dia concluída."}</div>
-      <button className="punchButton" onClick={punch} disabled={!data?.next_type||extraOpen}>{extraOpen?"PONTO NORMAL BLOQUEADO":blocked?"REGISTRO BLOQUEADO":data?.next_type?`REGISTRAR ${LABEL[data.next_type].toUpperCase()}`:"JORNADA CONCLUÍDA"}</button>
+      <div className="nextPunch">{blocked?`Ocorrência do dia: ${data?.today?.status}`:data?.next_type?`Próxima batida: ${LABEL[data.next_type]}`:"Jornada do dia concluída."}</div>
+      <button className="punchButton" onClick={punch} disabled={!data?.next_type}>{blocked?"REGISTRO BLOQUEADO":data?.next_type?`REGISTRAR ${LABEL[data.next_type].toUpperCase()}`:"JORNADA CONCLUÍDA"}</button>
       {error&&<div className="alert error" onClick={()=>setError("")}>{error}</div>}
       {notice&&<div className="alert" onClick={()=>setNotice("")}>{notice}</div>}
     </section>
@@ -136,7 +150,7 @@ export default function Ponto(){
     <section className="employeeMetrics">
       {[
         ["Horas trabalhadas",fmt(data?.totals.worked_minutes)],
-        ["Horas extras",fmt(data?.totals.extra_minutes)],
+        ["Horas extras aprovadas",fmt(data?.totals.extra_minutes)],
         ["Horas positivas",fmt(data?.totals.positive_minutes)],
         ["Horas negativas",fmt(data?.totals.negative_minutes)],
         ["Saldo",fmt(data?.totals.balance_minutes,true)]
@@ -151,29 +165,31 @@ export default function Ponto(){
 
     <section className="panel">
       <div className="sectionHead">
-        <div><p className="eyebrow">JORNADA EXTRA</p><h2>{extraOpen?"Em andamento":"Registrar horário extra"}</h2></div>
-        <span className="badge">100% positivo</span>
+        <div><p className="eyebrow">HORAS EXTRAS</p><h2>Solicitar registro manual</h2></div>
+        <span className="badge">Sujeito à aprovação</span>
       </div>
-      {extraOpen?<>
-        <div className="punchGrid">
-          <div><span>Data de entrada</span><strong>{formatDate(data.current_extra.start_date)}</strong></div>
-          <div><span>Entrada extra</span><strong>{String(data.current_extra.start_time).slice(0,5)}</strong></div>
-          <div><span>Referência</span><strong>{data.current_extra.description??"—"}</strong></div>
-        </div>
-        <div className="formAction"><button className="primary" onClick={toggleExtra} disabled={extraBusy}>{extraBusy?"REGISTRANDO...":"REGISTRAR SAÍDA EXTRA"}</button></div>
-      </>:<>
-        <div className="formGrid">
-          <label>Referência / treinamento (opcional)<input value={extraDescription} onChange={e=>setExtraDescription(e.target.value)} maxLength={160} placeholder="Ex.: Treinamento Karsten" /></label>
-          <div className="formAction"><button className="primary" type="button" onClick={toggleExtra} disabled={extraBusy}>{extraBusy?"REGISTRANDO...":"REGISTRAR ENTRADA EXTRA"}</button></div>
-        </div>
-      </>}
-      <p className="serverNote">A jornada extra usa apenas Entrada e Saída, pode atravessar a meia-noite e é somada integralmente às horas positivas. O horário é definido pelo servidor.</p>
+      <form className="formGrid" onSubmit={requestExtra}>
+        <label>Data da entrada<input type="date" value={extraStartDate} max={todaySP()} onChange={e=>setExtraStartDate(e.target.value)} required /></label>
+        <label>Hora da entrada<input type="time" value={extraStartTime} onChange={e=>setExtraStartTime(e.target.value)} required /></label>
+        <label>Data da saída<input type="date" value={extraEndDate} max={todaySP()} onChange={e=>setExtraEndDate(e.target.value)} required /></label>
+        <label>Hora da saída<input type="time" value={extraEndTime} onChange={e=>setExtraEndTime(e.target.value)} required /></label>
+        <label>Referência / motivo<input value={extraDescription} onChange={e=>setExtraDescription(e.target.value)} minLength={3} maxLength={160} placeholder="Ex.: Treinamento Karsten" required /></label>
+        <div className="formAction"><button className="primary" disabled={extraBusy}>{extraBusy?"ENVIANDO...":"ENVIAR HORAS EXTRAS PARA APROVAÇÃO"}</button></div>
+      </form>
+      <p className="serverNote">Exemplo: entrada 22:15 em 29/09 e saída 03:00 em 30/09. As horas só entram no banco depois da aprovação da CVT.</p>
     </section>
 
     <section className="panel tableWrap">
-      <h2>Últimas jornadas extras</h2>
-      <table><thead><tr><th>Data</th><th>Entrada extra</th><th>Saída extra</th><th>Duração</th><th>Referência</th></tr></thead>
-        <tbody>{data?.recent_extra?.length?data.recent_extra.map((x:any)=><tr key={x.id}><td>{formatDate(x.start_date)}</td><td>{String(x.start_time).slice(0,5)}</td><td>{extraEnd(x)}</td><td>{x.minutes==null?"Em andamento":fmt(x.minutes)}</td><td>{x.description??"—"}</td></tr>):<tr><td colSpan={5}>Nenhuma jornada extra registrada.</td></tr>}</tbody>
+      <h2>Minhas solicitações de horas extras</h2>
+      <table><thead><tr><th>Entrada</th><th>Saída</th><th>Duração</th><th>Referência</th><th>Status</th><th>Retorno</th></tr></thead>
+        <tbody>{extraRequests.length?extraRequests.map((x:any)=><tr key={x.id}><td>{formatDate(x.start_date)} {String(x.start_time).slice(0,5)}</td><td>{formatDate(x.end_date)} {String(x.end_time).slice(0,5)}</td><td>{fmt(Number(x.minutes))}</td><td>{x.description}</td><td>{statusLabel(x.status)}</td><td>{x.review_note??"—"}</td></tr>):<tr><td colSpan={6}>Nenhuma solicitação enviada.</td></tr>}</tbody>
+      </table>
+    </section>
+
+    <section className="panel tableWrap">
+      <h2>Horas extras aprovadas</h2>
+      <table><thead><tr><th>Data</th><th>Entrada</th><th>Saída</th><th>Duração</th><th>Referência</th></tr></thead>
+        <tbody>{data?.recent_extra?.length?data.recent_extra.map((x:any)=><tr key={x.id}><td>{formatDate(x.start_date)}</td><td>{String(x.start_time).slice(0,5)}</td><td>{extraEnd(x)}</td><td>{fmt(x.minutes)}</td><td>{x.description??"—"}</td></tr>):<tr><td colSpan={5}>Nenhuma hora extra aprovada.</td></tr>}</tbody>
       </table>
     </section>
 
