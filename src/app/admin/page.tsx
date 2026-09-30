@@ -44,6 +44,13 @@ const intervalText=(r:any)=>{
   if(r.intervalo_fim)return `? – ${String(r.intervalo_fim).slice(0,5)}`;
   return "—";
 };
+const reportRowClass=(r:any)=>{
+  if(Number(r.daily_balance_minutes)<0)return "balanceNegative";
+  if(Number(r.daily_balance_minutes)>0)return "balancePositive";
+  if(String(r.status||"").includes("CUMPRIDA"))return "balanceFulfilled";
+  if(r.status==="FIM DE SEMANA")return "mutedDay";
+  return "";
+};
 const extraEnd=(x:any)=>!x.end_time?"Em andamento":x.end_date&&x.end_date!==x.start_date?`${String(x.end_time).slice(0,5)} (${formatDate(x.end_date)})`:String(x.end_time).slice(0,5);
 const occurrenceLabel=(o:Occurrence)=>{
   if(o.occurrence_type==="FALTA")return "Falta";
@@ -75,6 +82,7 @@ export default function Admin(){
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
   const [report,setReport]=useState<Report|null>(null);
+  const [downloadingPdf,setDownloadingPdf]=useState(false);
   const [reportEmp,setReportEmp]=useState("ALL");
   const [month,setMonth]=useState(()=>todaySP().slice(0,7));
   const [passwordEmp,setPasswordEmp]=useState<Emp|null>(null);
@@ -138,7 +146,7 @@ export default function Admin(){
 
   const loadExtraWorkRequests=useCallback(async()=>{
     try{const d=await api("/api/admin/extra-work-requests");setExtraWorkRequests(d.requests||[]);}
-    catch(e){setError(e instanceof Error?e.message:"Erro ao carregar horas extras.");}
+    catch(e){setError(e instanceof Error?e.message:"Erro ao carregar jornadas extras.");}
   },[api]);
 
   useEffect(()=>{void loadBase();},[loadBase]);
@@ -239,7 +247,7 @@ export default function Admin(){
 
   async function reviewExtraWork(req:ExtraWorkRequest,decision:"APROVADO"|"REJEITADO"){
     const action=decision==="APROVADO"?"aprovar":"rejeitar";
-    if(!window.confirm(`Deseja ${action} ${fmt(req.minutes)} de horas extras de ${req.employee_name}?`))return;
+    if(!window.confirm(`Deseja ${action} a jornada extra de ${fmt(req.minutes)} de ${req.employee_name}?`))return;
     let reviewNote="";
     if(decision==="REJEITADO"){
       const typed=window.prompt("Motivo da rejeição (opcional):","");
@@ -250,8 +258,8 @@ export default function Admin(){
       setError("");setNotice("");
       await api("/api/admin/extra-work-requests",{method:"PATCH",body:JSON.stringify({id:req.id,decision,review_note:reviewNote})});
       await Promise.all([loadExtraWorkRequests(),loadBase()]);
-      setNotice(decision==="APROVADO"?"Horas extras aprovadas e adicionadas ao banco.":"Solicitação de horas extras rejeitada.");
-    }catch(e){setError(e instanceof Error?e.message:"Erro ao analisar horas extras.");}
+      setNotice(decision==="APROVADO"?"Jornada extra aprovada e adicionada como saldo positivo no banco.":"Solicitação de jornada extra rejeitada.");
+    }catch(e){setError(e instanceof Error?e.message:"Erro ao analisar jornada extra.");}
   }
 
   async function saveHoliday(e:FormEvent<HTMLFormElement>){
@@ -315,16 +323,27 @@ export default function Admin(){
   function exportCsv(){
     if(!report)return;
     const safe=(v:any)=>{let t=String(v??"");if(/^[=+\-@]/.test(t))t="'"+t;return `"${t.replaceAll('"','""')}"`;};
-    const header=["Funcionário","CPF","Data","Dia","Entrada","Intervalo","Saída","Trabalhado","Horas extras","Débito banco","Saldo do dia","Situação","Observação"];
+    const header=["Funcionário","CPF","Data","Dia","Entrada","Intervalo","Saída","Trabalhado","Débito banco","Saldo do dia","Situação","Observação"];
     const lines=[header.map(safe).join(";")];
     for(const r of report.rows)lines.push([
       r.employee_name,formatCpf(r.employee_cpf),formatDate(r.date),r.weekday,r.entrada?String(r.entrada).slice(0,5):"",
-      intervalText(r),r.saida?String(r.saida).slice(0,5):"",fmt(r.worked_minutes),fmt(r.extra_minutes),
+      intervalText(r),r.saida?String(r.saida).slice(0,5):"",fmt(r.worked_minutes),
       fmt(r.bank_debit_minutes),fmt(r.daily_balance_minutes,true),r.status,r.details??""
     ].map(safe).join(";"));
     const b=new Blob(["\ufeff"+lines.join("\r\n")],{type:"text/csv;charset=utf-8"});
     const u=URL.createObjectURL(b);const a=document.createElement("a");
     a.href=u;a.download=`espelho-ponto-cvt-${month}.csv`;a.click();URL.revokeObjectURL(u);
+  }
+
+  async function downloadPdf(){
+    if(!report||downloadingPdf)return;
+    setDownloadingPdf(true);setError("");
+    try{
+      const {downloadMonthlyReportPdf}=await import("@/lib/report-pdf");
+      downloadMonthlyReportPdf(report);
+    }catch(e){
+      setError(e instanceof Error?e.message:"Não foi possível gerar o PDF.");
+    }finally{setDownloadingPdf(false);}
   }
 
   const totals=dash?.totals??emptyTotals;
@@ -335,7 +354,7 @@ export default function Admin(){
       <nav>
         {[
           ["dashboard","Dashboard"],["employees","Funcionários"],["occurrences","Ocorrências"],
-          ["adjustments","Ajuste de ponto"],["requests","Solicitações de ajuste"],["extraRequests","Horas extras"],["holidays","Feriados"],["report","Relatório mensal"]
+          ["adjustments","Ajuste de ponto"],["requests","Solicitações de ajuste"],["extraRequests","Jornada extra"],["holidays","Feriados"],["report","Relatório mensal"]
         ].map(([k,l])=><button key={k} className={view===k?"active":""} onClick={()=>setView(k as View)}>{l}</button>)}
       </nav>
       <button className="logout" onClick={logout}>Sair</button>
@@ -350,12 +369,12 @@ export default function Admin(){
         <div className="metrics">
           {[
             ["Funcionários",dash?.total??0],["Ativos",dash?.active??0],["Horas trabalhadas",fmt(totals.worked_minutes)],
-            ["Horas extras",fmt(totals.extra_minutes)],["Horas positivas",fmt(totals.positive_minutes)],
-            ["Horas negativas",fmt(totals.negative_minutes)],["Saldo",fmt(totals.balance_minutes,true)]
+            ["Horas positivas",fmt(totals.positive_minutes)],["Horas negativas",fmt(totals.negative_minutes)],
+            ["Saldo",fmt(totals.balance_minutes,true)]
           ].map(([l,v])=><article className="metric" key={String(l)}><span>{l}</span><strong>{v}</strong></article>)}
         </div>
-        <div className="panel tableWrap"><table><thead><tr><th>Funcionário</th><th>Usuário</th><th>Trabalhado</th><th>Extras</th><th>Positivas</th><th>Negativas</th><th>Saldo</th><th>Status hoje</th></tr></thead>
-          <tbody>{dash?.employees.map(e=><tr key={e.id}><td>{e.name}</td><td>{e.login}</td><td>{fmt(e.totals.worked_minutes)}</td><td>{fmt(e.totals.extra_minutes)}</td><td>{fmt(e.totals.positive_minutes)}</td><td>{fmt(e.totals.negative_minutes)}</td><td>{fmt(e.totals.balance_minutes,true)}</td><td>{e.today_status}</td></tr>)}</tbody>
+        <div className="panel tableWrap"><table><thead><tr><th>Funcionário</th><th>Usuário</th><th>Trabalhado</th><th>Positivas</th><th>Negativas</th><th>Saldo</th><th>Status hoje</th></tr></thead>
+          <tbody>{dash?.employees.map(e=><tr key={e.id}><td>{e.name}</td><td>{e.login}</td><td>{fmt(e.totals.worked_minutes)}</td><td>{fmt(e.totals.positive_minutes)}</td><td>{fmt(e.totals.negative_minutes)}</td><td>{fmt(e.totals.balance_minutes,true)}</td><td>{e.today_status}</td></tr>)}</tbody>
         </table></div>
       </>}
 
@@ -437,11 +456,11 @@ export default function Admin(){
 
       {view==="extraRequests"&&<>
         <div className="panel">
-          <div className="sectionHead"><div><p className="eyebrow">APROVAÇÃO</p><h2>Solicitações de horas extras</h2></div><span className="badge">{extraWorkRequests.filter(r=>r.status==="PENDENTE").length} pendente(s)</span></div>
-          <p className="serverNote">As horas só entram no banco de horas após aprovação. Solicitações pendentes não alteram o saldo.</p>
+          <div className="sectionHead"><div><p className="eyebrow">APROVAÇÃO</p><h2>Solicitações de jornada extra</h2></div><span className="badge">{extraWorkRequests.filter(r=>r.status==="PENDENTE").length} pendente(s)</span></div>
+          <p className="serverNote">A jornada extra aprovada entra diretamente como saldo positivo no banco de horas. Solicitações pendentes não alteram o saldo.</p>
         </div>
         <div className="panel tableWrap"><table><thead><tr><th>Funcionário</th><th>Entrada</th><th>Saída</th><th>Duração</th><th>Referência</th><th>Status</th><th>Ações</th></tr></thead>
-          <tbody>{extraWorkRequests.length?extraWorkRequests.map(r=><tr key={r.id}><td>{r.employee_name}</td><td>{formatDate(r.start_date)} {String(r.start_time).slice(0,5)}</td><td>{formatDate(r.end_date)} {String(r.end_time).slice(0,5)}</td><td>{fmt(r.minutes)}</td><td>{r.description}</td><td>{r.status}{r.review_note?` — ${r.review_note}`:""}</td><td>{r.status==="PENDENTE"?<div className="reportActions"><button className="primary" onClick={()=>reviewExtraWork(r,"APROVADO")}>Aprovar</button><button className="secondary" onClick={()=>reviewExtraWork(r,"REJEITADO")}>Rejeitar</button></div>:"—"}</td></tr>):<tr><td colSpan={7}>Nenhuma solicitação de horas extras.</td></tr>}</tbody>
+          <tbody>{extraWorkRequests.length?extraWorkRequests.map(r=><tr key={r.id}><td>{r.employee_name}</td><td>{formatDate(r.start_date)} {String(r.start_time).slice(0,5)}</td><td>{formatDate(r.end_date)} {String(r.end_time).slice(0,5)}</td><td>{fmt(r.minutes)}</td><td>{r.description}</td><td>{r.status}{r.review_note?` — ${r.review_note}`:""}</td><td>{r.status==="PENDENTE"?<div className="reportActions"><button className="primary" onClick={()=>reviewExtraWork(r,"APROVADO")}>Aprovar</button><button className="secondary" onClick={()=>reviewExtraWork(r,"REJEITADO")}>Rejeitar</button></div>:"—"}</td></tr>):<tr><td colSpan={7}>Nenhuma solicitação de jornada extra.</td></tr>}</tbody>
         </table></div>
       </>}
 
@@ -467,7 +486,7 @@ export default function Admin(){
           <div className="reportTools">
             <label>Funcionário<select value={reportEmp} onChange={e=>setReportEmp(e.target.value)}><option value="ALL">Todos os funcionários</option>{employees.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></label>
             <label>Mês<input type="month" value={month} onChange={e=>setMonth(e.target.value)} /></label>
-            <div className="reportActions"><button className="primary" onClick={generate}>GERAR</button><button className="secondary" onClick={exportCsv} disabled={!report}>EXCEL / CSV</button><button className="dark" onClick={()=>window.print()} disabled={!report}>IMPRIMIR / PDF</button></div>
+            <div className="reportActions"><button className="primary" onClick={generate}>GERAR</button><button className="secondary" onClick={exportCsv} disabled={!report}>EXCEL / CSV</button><button className="dark" onClick={downloadPdf} disabled={!report||downloadingPdf}>{downloadingPdf?"GERANDO PDF...":"BAIXAR PDF"}</button></div>
           </div>
         </div>
 
@@ -490,7 +509,6 @@ export default function Admin(){
             <div className="printTotals">
               {[
                 ["Trabalhadas",fmt(employeeReport.totals.worked_minutes)],
-                ["Horas extras",fmt(employeeReport.totals.extra_minutes)],
                 ["Positivas",fmt(employeeReport.totals.positive_minutes)],
                 ["Negativas",fmt(employeeReport.totals.negative_minutes)],
                 ["Saldo do mês",fmt(employeeReport.totals.balance_minutes,true)]
@@ -499,15 +517,14 @@ export default function Admin(){
 
             <div className="tableWrap printTableWrap">
               <table className="monthlyPunchTable">
-                <thead><tr><th>Data</th><th>Dia</th><th>Entrada</th><th>Intervalo</th><th>Saída</th><th>Trabalhado</th><th>H. extra</th><th>Débito</th><th>Saldo dia</th><th>Situação / observação</th></tr></thead>
-                <tbody>{employeeReport.rows.map((r:any)=><tr key={r.date} className={r.status==="FIM DE SEMANA"?"mutedDay":""}>
+                <thead><tr><th>Data</th><th>Dia</th><th>Entrada</th><th>Intervalo</th><th>Saída</th><th>Trabalhado</th><th>Débito</th><th>Saldo dia</th><th>Situação / observação</th></tr></thead>
+                <tbody>{employeeReport.rows.map((r:any)=><tr key={r.date} className={reportRowClass(r)}>
                   <td>{formatDate(r.date)}</td>
                   <td>{r.weekday}</td>
                   <td>{r.entrada?String(r.entrada).slice(0,5):"—"}</td>
                   <td>{intervalText(r)}</td>
                   <td>{r.saida?String(r.saida).slice(0,5):"—"}</td>
                   <td>{fmt(r.worked_minutes)}</td>
-                  <td>{r.extra_minutes?fmt(r.extra_minutes):"—"}</td>
                   <td>{r.bank_debit_minutes?fmt(r.bank_debit_minutes):"—"}</td>
                   <td>{fmt(r.daily_balance_minutes,true)}</td>
                   <td className="statusCell"><strong>{r.status}</strong>{r.details&&<span>{r.details}</span>}</td>
