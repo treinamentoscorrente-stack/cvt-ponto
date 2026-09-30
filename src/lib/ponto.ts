@@ -96,10 +96,8 @@ function outcome(balance: number) {
 }
 
 function calcWorked(by: Record<string,string>, occurrence: DayOccurrence | null) {
-  if (occurrence?.occurrence_type === "FOLGA" && occurrence.period !== "DIA_TODO") {
-    if (by.ENTRADA && by.SAIDA && !by.INTERVALO_INICIO && !by.INTERVALO_FIM) {
-      return timeMinutes(by.SAIDA) - timeMinutes(by.ENTRADA);
-    }
+  if (by.ENTRADA && by.SAIDA && !by.INTERVALO_INICIO && !by.INTERVALO_FIM) {
+    return timeMinutes(by.SAIDA) - timeMinutes(by.ENTRADA);
   }
   if (by.ENTRADA && by.INTERVALO_INICIO && by.INTERVALO_FIM && by.SAIDA) {
     return (timeMinutes(by.INTERVALO_INICIO) - timeMinutes(by.ENTRADA))
