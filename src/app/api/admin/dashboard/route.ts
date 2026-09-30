@@ -14,6 +14,7 @@ export async function GET(){
 
   const employees=(await db.query("SELECT id,name,status,login FROM employees ORDER BY name")).rows;
   const today=saoPauloNow().date;
+  const currentMonth=today.slice(0,7);
   const all:any[]=[];
   const out:any[]=[];
   let allExtra=0;
@@ -21,8 +22,8 @@ export async function GET(){
   for(const employee of employees){
     const id=Number(employee.id);
     const [summaries,extraMinutes]=await Promise.all([
-      summariesForEmployee(id),
-      extraMinutesForEmployee(id),
+      summariesForEmployee(id,currentMonth),
+      extraMinutesForEmployee(id,currentMonth),
     ]);
     all.push(...summaries);
     allExtra+=extraMinutes;
