@@ -37,11 +37,24 @@
 - Não pode coexistir com batidas no mesmo dia.
 
 ## Ajuste manual do ponto
-- Somente administrador.
-- Permite inserir, corrigir ou remover Entrada, Início intervalo, Fim intervalo e Saída.
+- O administrador pode inserir, corrigir ou remover Entrada, Início intervalo, Fim intervalo e Saída.
+- O funcionário também pode solicitar um ajuste, mas a solicitação fica PENDENTE e não altera o ponto até aprovação administrativa.
 - O motivo do ajuste é obrigatório.
 - A auditoria registra funcionário, data, motivo, valores anteriores e valores novos.
 - Horários informados devem respeitar ordem crescente.
+
+## Jornada extra
+- É separada da jornada normal.
+- Usa somente Entrada Extra → Saída Extra, sem intervalo.
+- Os horários são registrados pelo servidor; o funcionário não escolhe manualmente a hora.
+- Pode atravessar a meia-noite. Exemplo: 22:15 → 03:00 = 4h45.
+- Uma única jornada extra pode ficar aberta por funcionário.
+- Enquanto a jornada extra estiver aberta, o ponto normal fica bloqueado para evitar sobreposição.
+- A duração completa da jornada extra entra como horas trabalhadas e como horas positivas.
+- A jornada normal do dia continua com sua previsão própria; a jornada extra não altera as 8h previstas.
+- Para fechamento mensal, a jornada extra pertence ao mês/data em que a Entrada Extra foi registrada.
+- A referência do treinamento/empresa pode ser informada opcionalmente, por exemplo: Treinamento Karsten.
+- Esta regra registra minutos extras no banco de horas; não calcula adicional remuneratório, adicional noturno ou percentuais de folha.
 
 ## Dias sem registro
 - Um dia útil sem ponto e sem ocorrência continua como SEM REGISTRO.
@@ -49,6 +62,7 @@
 - Para efetuar o débito integral, o administrador deve lançar FALTA.
 
 ## Relatórios
+- Jornadas extras aparecem separadamente e também são somadas aos totais de horas trabalhadas, horas positivas e saldo.
 - Falta entra nas horas negativas.
 - Atestado e folga integral não geram débito.
 - Folga parcial usa 4h previstas.
