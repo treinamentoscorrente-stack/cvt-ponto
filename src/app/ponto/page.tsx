@@ -114,7 +114,7 @@ export default function Ponto(){
     }catch(e){setError(e instanceof Error?e.message:"Erro ao enviar solicitação.");}
   }
 
-  const blocked=["FALTA","ATESTADO"].includes(data?.today?.occurrence_type);
+  const blocked=["FALTA","ATESTADO"].includes(data?.today?.occurrence_type)||(data?.today?.occurrence_type==="FOLGA"&&data?.today?.occurrence_period==="DIA_TODO");
   const extraOpen=!!data?.current_extra;
 
   return <main className="employeePage">
