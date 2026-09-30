@@ -19,6 +19,17 @@ const fmt=(n:number|null|undefined,s=false)=>{
   return `${sign}${String(Math.floor(a/60)).padStart(2,"0")}h${String(a%60).padStart(2,"0")}`;
 };
 const todaySP=()=>new Intl.DateTimeFormat("sv-SE",{timeZone:"America/Sao_Paulo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+const formatDate=(value:string|null|undefined)=>{
+  if(!value)return "—";
+  const raw=String(value).slice(0,10);
+  const match=raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match?`${match[3]}/${match[2]}/${match[1]}`:value;
+};
+const formatMonth=(value:string|null|undefined)=>{
+  if(!value)return "Selecione um período";
+  const match=String(value).match(/^(\d{4})-(\d{2})$/);
+  return match?`${match[2]}/${match[1]}`:value;
+};
 const occurrenceLabel=(o:Occurrence)=>{
   if(o.occurrence_type==="FALTA")return "Falta";
   if(o.occurrence_type==="ATESTADO")return "Atestado";
@@ -230,7 +241,7 @@ export default function Admin(){
     const header=["Funcionário","Data","Entrada","Início intervalo","Fim intervalo","Saída","Trabalhado","Previsto","Saldo","Status","Observação"];
     const lines=[header.map(safe).join(";")];
     for(const r of report.rows)lines.push([
-      r.employee_name,r.date,r.entrada,r.intervalo_inicio,r.intervalo_fim,r.saida,
+      r.employee_name,formatDate(r.date),r.entrada,r.intervalo_inicio,r.intervalo_fim,r.saida,
       fmt(r.worked_minutes),fmt(r.expected_minutes),fmt(r.balance_minutes,true),r.status,r.note??r.holiday_description??""
     ].map(safe).join(";"));
     const b=new Blob(["\ufeff"+lines.join("\r\n")],{type:"text/csv;charset=utf-8"});
@@ -283,7 +294,7 @@ export default function Admin(){
           </form>
         </div>
         <div className="panel tableWrap"><table><thead><tr><th>Nome</th><th>Usuário</th><th>CPF</th><th>Admissão</th><th>Status</th><th>Ações</th></tr></thead>
-          <tbody>{employees.map(e=><tr key={e.id}><td>{e.name}</td><td>{e.login}</td><td>{e.cpf}</td><td>{e.admission_date}</td><td>{e.status}</td><td><div className="reportActions"><button className="secondary" onClick={()=>toggle(e)}>{e.status==="ATIVO"?"Inativar":"Ativar"}</button><button className="dark" onClick={()=>{setPasswordEmp(e);setNewPassword("");setConfirmPassword("");}}>Redefinir senha</button></div></td></tr>)}</tbody>
+          <tbody>{employees.map(e=><tr key={e.id}><td>{e.name}</td><td>{e.login}</td><td>{e.cpf}</td><td>{formatDate(e.admission_date)}</td><td>{e.status}</td><td><div className="reportActions"><button className="secondary" onClick={()=>toggle(e)}>{e.status==="ATIVO"?"Inativar":"Ativar"}</button><button className="dark" onClick={()=>{setPasswordEmp(e);setNewPassword("");setConfirmPassword("");}}>Redefinir senha</button></div></td></tr>)}</tbody>
         </table></div>
         {passwordEmp&&<div className="panel">
           <div className="sectionHead"><div><p className="eyebrow">SEGURANÇA</p><h2>Redefinir senha — {passwordEmp.name}</h2></div><button className="secondary" type="button" onClick={()=>setPasswordEmp(null)}>Cancelar</button></div>
@@ -308,7 +319,7 @@ export default function Admin(){
           </form>
         </div>
         <div className="panel tableWrap"><table><thead><tr><th>Data</th><th>Funcionário</th><th>Ocorrência</th><th>Observação</th><th>Ação</th></tr></thead>
-          <tbody>{occurrences.map(o=><tr key={o.id}><td>{o.work_date}</td><td>{o.employee_name}</td><td>{occurrenceLabel(o)}</td><td>{o.note??"—"}</td><td><button className="secondary" onClick={()=>removeOccurrence(o.id)}>Remover</button></td></tr>)}</tbody>
+          <tbody>{occurrences.map(o=><tr key={o.id}><td>{formatDate(o.work_date)}</td><td>{o.employee_name}</td><td>{occurrenceLabel(o)}</td><td>{o.note??"—"}</td><td><button className="secondary" onClick={()=>removeOccurrence(o.id)}>Remover</button></td></tr>)}</tbody>
         </table></div>
       </>}
 
@@ -345,7 +356,7 @@ export default function Admin(){
           </form>
         </div>
         <div className="panel tableWrap"><table><thead><tr><th>Data</th><th>Feriado</th><th>Ação</th></tr></thead>
-          <tbody>{holidays.map(h=><tr key={h.id}><td>{h.holiday_date}</td><td>{h.description}</td><td><button className="secondary" onClick={()=>removeHoliday(h.id)}>Remover</button></td></tr>)}</tbody>
+          <tbody>{holidays.map(h=><tr key={h.id}><td>{formatDate(h.holiday_date)}</td><td>{h.description}</td><td><button className="secondary" onClick={()=>removeHoliday(h.id)}>Remover</button></td></tr>)}</tbody>
         </table></div>
       </>}
 
@@ -358,10 +369,10 @@ export default function Admin(){
           </div>
         </div>
         <div className="panel printArea">
-          <div className="reportHeader"><div><p className="eyebrow">RELATÓRIO MENSAL DE HORAS</p><h2>{report?.month??"Selecione um período"}</h2><span>{report?.employee_label??""}</span></div><strong>Corrente da Vida Treinamentos — CVT</strong></div>
+          <div className="reportHeader"><div><p className="eyebrow">RELATÓRIO MENSAL DE HORAS</p><h2>{formatMonth(report?.month)}</h2><span>{report?.employee_label??""}</span></div><strong>Corrente da Vida Treinamentos — CVT</strong></div>
           <div className="reportSummary">{[["Trabalhadas",fmt(report?.totals.worked_minutes)],["Positivas",fmt(report?.totals.positive_minutes)],["Negativas",fmt(report?.totals.negative_minutes)],["Saldo",fmt(report?.totals.balance_minutes,true)],["Pendências",report?.totals.pending??0]].map(([l,v])=><article className="metric" key={String(l)}><span>{l}</span><strong>{v}</strong></article>)}</div>
           <div className="tableWrap"><table><thead><tr><th>Funcionário</th><th>Data</th><th>Entrada</th><th>Início intervalo</th><th>Fim intervalo</th><th>Saída</th><th>Trabalhado</th><th>Previsto</th><th>Saldo</th><th>Status</th><th>Observação</th></tr></thead>
-            <tbody>{report?.rows.map((r,i)=><tr key={i}><td>{r.employee_name}</td><td>{r.date}</td><td>{r.entrada??"—"}</td><td>{r.intervalo_inicio??"—"}</td><td>{r.intervalo_fim??"—"}</td><td>{r.saida??"—"}</td><td>{fmt(r.worked_minutes)}</td><td>{fmt(r.expected_minutes)}</td><td>{fmt(r.balance_minutes,true)}</td><td>{r.status}</td><td>{r.note??r.holiday_description??"—"}</td></tr>)}</tbody>
+            <tbody>{report?.rows.map((r,i)=><tr key={i}><td>{r.employee_name}</td><td>{formatDate(r.date)}</td><td>{r.entrada??"—"}</td><td>{r.intervalo_inicio??"—"}</td><td>{r.intervalo_fim??"—"}</td><td>{r.saida??"—"}</td><td>{fmt(r.worked_minutes)}</td><td>{fmt(r.expected_minutes)}</td><td>{fmt(r.balance_minutes,true)}</td><td>{r.status}</td><td>{r.note??r.holiday_description??"—"}</td></tr>)}</tbody>
           </table></div>
         </div>
       </>}
