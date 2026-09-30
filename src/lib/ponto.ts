@@ -154,6 +154,10 @@ export async function summarizeRows(
     worked = 0;
     balance = 0;
     status = "FERIADO";
+  } else if (weekend(date) && rows.length === 0 && !occurrence) {
+    worked = 0;
+    balance = 0;
+    status = "FIM DE SEMANA";
   } else {
     worked = calcWorked(by, occurrence);
     if (worked !== null) {
@@ -257,14 +261,33 @@ export async function summariesForEmployee(employeeId: number, month?: string) {
   if (month) {
     const employee = await db.query(`SELECT admission_date::text AS admission_date FROM employees WHERE id=$1`, [employeeId]);
     const admission = employee.rows[0]?.admission_date ?? "9999-12-31";
+
+    const [year,monthNumber] = month.split("-").map(Number);
+    const monthStart = `${month}-01`;
+    const monthEnd = new Date(Date.UTC(year, monthNumber, 0)).toISOString().slice(0,10);
+    const today = saoPauloNow().date;
+    const effectiveEnd = month < today.slice(0,7) ? monthEnd : month === today.slice(0,7) ? today : "";
+    const effectiveStart = admission > monthStart ? admission : monthStart;
+
+    if (effectiveEnd && effectiveStart <= effectiveEnd) {
+      const cursor = new Date(`${effectiveStart}T00:00:00Z`);
+      const end = new Date(`${effectiveEnd}T00:00:00Z`);
+      while (cursor <= end) {
+        dates.add(cursor.toISOString().slice(0,10));
+        cursor.setUTCDate(cursor.getUTCDate()+1);
+      }
+    }
+
     const h = await db.query(
       `SELECT holiday_date::text AS holiday_date,description
        FROM holidays WHERE holiday_date::text LIKE $1 AND holiday_date >= $2::date`,
       [`${month}-%`, admission],
     );
     for (const row of h.rows) {
-      dates.add(row.holiday_date);
-      holidays.set(row.holiday_date, row.description);
+      if (!effectiveEnd || row.holiday_date <= effectiveEnd) {
+        dates.add(row.holiday_date);
+        holidays.set(row.holiday_date, row.description);
+      }
     }
   }
 
