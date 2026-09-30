@@ -9,7 +9,8 @@ type Dash = { total:number; active:number; inactive:number; totals:Totals; emplo
 type Report = { month:string; employee_label:string; totals:Totals; rows:Array<any> };
 type Occurrence = { id:number; employee_id:number; employee_name:string; work_date:string; occurrence_type:"FALTA"|"FOLGA"|"ATESTADO"; period:"DIA_TODO"|"MANHA"|"TARDE"; note:string|null };
 type Holiday = { id:number; holiday_date:string; description:string };
-type View = "dashboard"|"employees"|"occurrences"|"adjustments"|"holidays"|"report";
+type AdjustmentRequest = { id:number; employee_id:number; employee_name:string; work_date:string; requested_entrada:string|null; requested_intervalo_inicio:string|null; requested_intervalo_fim:string|null; requested_saida:string|null; reason:string; original_punches:Array<{punch_type:string;punch_time:string}>; status:"PENDENTE"|"APROVADO"|"REJEITADO"; review_note:string|null; created_at:string; reviewed_at:string|null };
+type View = "dashboard"|"employees"|"occurrences"|"adjustments"|"requests"|"holidays"|"report";
 
 const emptyTotals:Totals = {worked_minutes:0,positive_minutes:0,negative_minutes:0,balance_minutes:0,pending:0};
 const fmt=(n:number|null|undefined,s=false)=>{
@@ -37,6 +38,20 @@ const occurrenceLabel=(o:Occurrence)=>{
   if(o.period==="TARDE")return "Folga tarde";
   return "Folga integral";
 };
+const punchLabel:Record<string,string>={ENTRADA:"E",INTERVALO_INICIO:"I.I.",INTERVALO_FIM:"F.I.",SAIDA:"S"};
+const originalText=(rows:Array<{punch_type:string;punch_time:string}>|null|undefined)=>{
+  if(!rows?.length)return "Sem registros";
+  return rows.map(r=>`${punchLabel[r.punch_type]??r.punch_type} ${String(r.punch_time).slice(0,5)}`).join(" • ");
+};
+const requestedText=(r:AdjustmentRequest)=>{
+  const parts=[
+    r.requested_entrada&&`E ${String(r.requested_entrada).slice(0,5)}`,
+    r.requested_intervalo_inicio&&`I.I. ${String(r.requested_intervalo_inicio).slice(0,5)}`,
+    r.requested_intervalo_fim&&`F.I. ${String(r.requested_intervalo_fim).slice(0,5)}`,
+    r.requested_saida&&`S ${String(r.requested_saida).slice(0,5)}`,
+  ].filter(Boolean);
+  return parts.length?parts.join(" • "):"Remover todas as batidas";
+};
 
 export default function Admin(){
   const router=useRouter();
@@ -58,6 +73,7 @@ export default function Admin(){
   const [occPeriod,setOccPeriod]=useState<"DIA_TODO"|"MANHA"|"TARDE">("DIA_TODO");
 
   const [holidays,setHolidays]=useState<Holiday[]>([]);
+  const [adjustmentRequests,setAdjustmentRequests]=useState<AdjustmentRequest[]>([]);
 
   const [adjustEmployee,setAdjustEmployee]=useState("");
   const [adjustDate,setAdjustDate]=useState(todaySP());
@@ -100,11 +116,17 @@ export default function Admin(){
     catch(e){setError(e instanceof Error?e.message:"Erro ao carregar feriados.");}
   },[api]);
 
+  const loadAdjustmentRequests=useCallback(async()=>{
+    try{const d=await api("/api/admin/adjustment-requests");setAdjustmentRequests(d.requests||[]);}
+    catch(e){setError(e instanceof Error?e.message:"Erro ao carregar solicitações.");}
+  },[api]);
+
   useEffect(()=>{void loadBase();},[loadBase]);
   useEffect(()=>{
     if(view==="occurrences")void loadOccurrences();
+    if(view==="requests")void loadAdjustmentRequests();
     if(view==="holidays")void loadHolidays();
-  },[view,loadOccurrences,loadHolidays]);
+  },[view,loadOccurrences,loadAdjustmentRequests,loadHolidays]);
 
   async function logout(){
     await api("/api/auth/logout",{method:"POST",body:"{}"});
@@ -175,6 +197,23 @@ export default function Admin(){
       await Promise.all([loadOccurrences(),loadBase()]);
       setNotice("Ocorrência removida.");
     }catch(e){setError(e instanceof Error?e.message:"Erro ao remover ocorrência.");}
+  }
+
+  async function reviewAdjustmentRequest(req:AdjustmentRequest,decision:"APROVADO"|"REJEITADO"){
+    const action=decision==="APROVADO"?"aprovar":"rejeitar";
+    if(!window.confirm(`Deseja ${action} o ajuste de ${req.employee_name} em ${formatDate(req.work_date)}?`))return;
+    let reviewNote="";
+    if(decision==="REJEITADO"){
+      const typed=window.prompt("Motivo da rejeição (opcional):","");
+      if(typed===null)return;
+      reviewNote=typed.trim();
+    }
+    try{
+      setError("");setNotice("");
+      await api("/api/admin/adjustment-requests",{method:"PATCH",body:JSON.stringify({id:req.id,decision,review_note:reviewNote})});
+      await Promise.all([loadAdjustmentRequests(),loadBase()]);
+      setNotice(decision==="APROVADO"?"Ajuste aprovado e aplicado ao ponto.":"Solicitação rejeitada; o ponto foi mantido.");
+    }catch(e){setError(e instanceof Error?e.message:"Erro ao analisar solicitação.");}
   }
 
   async function saveHoliday(e:FormEvent<HTMLFormElement>){
@@ -257,7 +296,7 @@ export default function Admin(){
       <nav>
         {[
           ["dashboard","Dashboard"],["employees","Funcionários"],["occurrences","Ocorrências"],
-          ["adjustments","Ajuste de ponto"],["holidays","Feriados"],["report","Relatório mensal"]
+          ["adjustments","Ajuste de ponto"],["requests","Solicitações de ajuste"],["holidays","Feriados"],["report","Relatório mensal"]
         ].map(([k,l])=><button key={k} className={view===k?"active":""} onClick={()=>setView(k as View)}>{l}</button>)}
       </nav>
       <button className="logout" onClick={logout}>Sair</button>
@@ -344,6 +383,16 @@ export default function Admin(){
           </form>
           <p className="serverNote">Campos vazios removem aquela batida. Todo ajuste registra antes, depois e motivo na auditoria.</p>
         </div>}
+      </>}
+
+      {view==="requests"&&<>
+        <div className="panel">
+          <div className="sectionHead"><div><p className="eyebrow">APROVAÇÃO</p><h2>Solicitações de ajuste dos funcionários</h2></div><span className="badge">{adjustmentRequests.filter(r=>r.status==="PENDENTE").length} pendente(s)</span></div>
+          <p className="serverNote">O ponto só é alterado quando a solicitação é aprovada. Rejeições mantêm os registros originais.</p>
+        </div>
+        <div className="panel tableWrap"><table><thead><tr><th>Data</th><th>Funcionário</th><th>Ponto original</th><th>Solicitado</th><th>Motivo</th><th>Status</th><th>Ações</th></tr></thead>
+          <tbody>{adjustmentRequests.length?adjustmentRequests.map(r=><tr key={r.id}><td>{formatDate(r.work_date)}</td><td>{r.employee_name}</td><td>{originalText(r.original_punches)}</td><td>{requestedText(r)}</td><td>{r.reason}</td><td>{r.status}{r.review_note?` — ${r.review_note}`:""}</td><td>{r.status==="PENDENTE"?<div className="reportActions"><button className="primary" onClick={()=>reviewAdjustmentRequest(r,"APROVADO")}>Aprovar</button><button className="secondary" onClick={()=>reviewAdjustmentRequest(r,"REJEITADO")}>Rejeitar</button></div>:"—"}</td></tr>):<tr><td colSpan={7}>Nenhuma solicitação encontrada.</td></tr>}</tbody>
+        </table></div>
       </>}
 
       {view==="holidays"&&<>
