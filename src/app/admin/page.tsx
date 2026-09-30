@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 type Emp = { id:number; name:string; cpf:string; admission_date:string; status:"ATIVO"|"INATIVO"; login:string };
 type Totals = { worked_minutes:number; positive_minutes:number; negative_minutes:number; balance_minutes:number; pending:number; extra_minutes:number };
 type Dash = { total:number; active:number; inactive:number; totals:Totals; employees:Array<{id:number;name:string;login:string;status:string;totals:Totals;today_status:string}> };
-type Report = { month:string; employee_label:string; totals:Totals; rows:Array<any>; extra_rows:Array<any> };
+type EmployeeReport = { employee_id:number; employee_name:string; employee_cpf:string; admission_date:string; totals:Totals; rows:Array<any> };
+type Report = { month:string; employee_label:string; totals:Totals; rows:Array<any>; extra_rows:Array<any>; employee_reports:Array<EmployeeReport> };
 type Occurrence = { id:number; employee_id:number; employee_name:string; work_date:string; occurrence_type:"FALTA"|"FOLGA"|"ATESTADO"; period:"DIA_TODO"|"MANHA"|"TARDE"; note:string|null };
 type Holiday = { id:number; holiday_date:string; description:string };
 type AdjustmentRequest = { id:number; employee_id:number; employee_name:string; work_date:string; requested_entrada:string|null; requested_intervalo_inicio:string|null; requested_intervalo_fim:string|null; requested_saida:string|null; reason:string; original_punches:Array<{punch_type:string;punch_time:string}>; status:"PENDENTE"|"APROVADO"|"REJEITADO"; review_note:string|null; created_at:string; reviewed_at:string|null };
@@ -31,6 +32,17 @@ const formatMonth=(value:string|null|undefined)=>{
   if(!value)return "Selecione um período";
   const match=String(value).match(/^(\d{4})-(\d{2})$/);
   return match?`${match[2]}/${match[1]}`:value;
+};
+const formatCpf=(value:string|null|undefined)=>{
+  const digits=String(value??"").replace(/\D/g,"");
+  if(digits.length!==11)return value||"—";
+  return `${digits.slice(0,3)}.${digits.slice(3,6)}.${digits.slice(6,9)}-${digits.slice(9)}`;
+};
+const intervalText=(r:any)=>{
+  if(r.intervalo_inicio&&r.intervalo_fim)return `${String(r.intervalo_inicio).slice(0,5)} – ${String(r.intervalo_fim).slice(0,5)}`;
+  if(r.intervalo_inicio)return `${String(r.intervalo_inicio).slice(0,5)} – ?`;
+  if(r.intervalo_fim)return `? – ${String(r.intervalo_fim).slice(0,5)}`;
+  return "—";
 };
 const extraEnd=(x:any)=>!x.end_time?"Em andamento":x.end_date&&x.end_date!==x.start_date?`${String(x.end_time).slice(0,5)} (${formatDate(x.end_date)})`:String(x.end_time).slice(0,5);
 const occurrenceLabel=(o:Occurrence)=>{
@@ -303,20 +315,16 @@ export default function Admin(){
   function exportCsv(){
     if(!report)return;
     const safe=(v:any)=>{let t=String(v??"");if(/^[=+\-@]/.test(t))t="'"+t;return `"${t.replaceAll('"','""')}"`;};
-    const header=["Funcionário","Data","Tipo","Entrada","Início intervalo","Fim intervalo","Saída","Trabalhado","Previsto","Débito banco","Saldo","Status","Observação"];
+    const header=["Funcionário","CPF","Data","Dia","Entrada","Intervalo","Saída","Trabalhado","Horas extras","Débito banco","Saldo do dia","Situação","Observação"];
     const lines=[header.map(safe).join(";")];
     for(const r of report.rows)lines.push([
-      r.employee_name,formatDate(r.date),"Jornada normal",r.entrada,r.intervalo_inicio,r.intervalo_fim,r.saida,
-      fmt(r.worked_minutes),fmt(r.expected_minutes),fmt(r.bank_debit_minutes),fmt(r.balance_minutes,true),r.status,r.note??r.holiday_description??""
-    ].map(safe).join(";"));
-    for(const x of report.extra_rows||[])lines.push([
-      x.employee_name,formatDate(x.start_date),"Jornada extra",String(x.start_time).slice(0,5),"—","—",extraEnd(x),
-      x.minutes==null?"—":fmt(x.minutes),"00h00","00h00",x.minutes==null?"—":fmt(x.minutes,true),
-      x.open?"EM ANDAMENTO":"JORNADA EXTRA",x.description??""
+      r.employee_name,formatCpf(r.employee_cpf),formatDate(r.date),r.weekday,r.entrada?String(r.entrada).slice(0,5):"",
+      intervalText(r),r.saida?String(r.saida).slice(0,5):"",fmt(r.worked_minutes),fmt(r.extra_minutes),
+      fmt(r.bank_debit_minutes),fmt(r.daily_balance_minutes,true),r.status,r.details??""
     ].map(safe).join(";"));
     const b=new Blob(["\ufeff"+lines.join("\r\n")],{type:"text/csv;charset=utf-8"});
     const u=URL.createObjectURL(b);const a=document.createElement("a");
-    a.href=u;a.download=`relatorio-cvt-${month}.csv`;a.click();URL.revokeObjectURL(u);
+    a.href=u;a.download=`espelho-ponto-cvt-${month}.csv`;a.click();URL.revokeObjectURL(u);
   }
 
   const totals=dash?.totals??emptyTotals;
@@ -452,24 +460,73 @@ export default function Admin(){
       </>}
 
       {view==="report"&&<>
-        <div className="panel noPrint"><p className="eyebrow">FECHAMENTO</p><h2>Relatório mensal</h2>
+        <div className="panel noPrint">
+          <p className="eyebrow">CONFERÊNCIA MENSAL</p>
+          <h2>Espelho mensal de ponto</h2>
+          <p className="serverNote">O PDF apresenta todos os dias já transcorridos do mês, incluindo jornadas, folgas, faltas, atestados, feriados, fins de semana e horas extras aprovadas.</p>
           <div className="reportTools">
             <label>Funcionário<select value={reportEmp} onChange={e=>setReportEmp(e.target.value)}><option value="ALL">Todos os funcionários</option>{employees.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></label>
             <label>Mês<input type="month" value={month} onChange={e=>setMonth(e.target.value)} /></label>
             <div className="reportActions"><button className="primary" onClick={generate}>GERAR</button><button className="secondary" onClick={exportCsv} disabled={!report}>EXCEL / CSV</button><button className="dark" onClick={()=>window.print()} disabled={!report}>IMPRIMIR / PDF</button></div>
           </div>
         </div>
-        <div className="panel printArea">
-          <div className="reportHeader"><div><p className="eyebrow">RELATÓRIO MENSAL DE HORAS</p><h2>{formatMonth(report?.month)}</h2><span>{report?.employee_label??""}</span></div><strong>Corrente da Vida Treinamentos — CVT</strong></div>
-          <div className="reportSummary">{[["Trabalhadas",fmt(report?.totals.worked_minutes)],["Horas extras",fmt(report?.totals.extra_minutes)],["Positivas",fmt(report?.totals.positive_minutes)],["Negativas",fmt(report?.totals.negative_minutes)],["Saldo",fmt(report?.totals.balance_minutes,true)],["Pendências",report?.totals.pending??0]].map(([l,v])=><article className="metric" key={String(l)}><span>{l}</span><strong>{v}</strong></article>)}</div>
-          <h2>Jornada normal</h2>
-          <div className="tableWrap"><table><thead><tr><th>Funcionário</th><th>Data</th><th>Entrada</th><th>Início intervalo</th><th>Fim intervalo</th><th>Saída</th><th>Trabalhado</th><th>Previsto</th><th>Débito banco</th><th>Saldo</th><th>Status</th><th>Observação</th></tr></thead>
-            <tbody>{report?.rows.map((r,i)=><tr key={i}><td>{r.employee_name}</td><td>{formatDate(r.date)}</td><td>{r.entrada??"—"}</td><td>{r.intervalo_inicio??"—"}</td><td>{r.intervalo_fim??"—"}</td><td>{r.saida??"—"}</td><td>{fmt(r.worked_minutes)}</td><td>{fmt(r.expected_minutes)}</td><td>{fmt(r.bank_debit_minutes)}</td><td>{fmt(r.balance_minutes,true)}</td><td>{r.status}</td><td>{r.note??r.holiday_description??"—"}</td></tr>)}</tbody>
-          </table></div>
-          <h2>Jornadas extras</h2>
-          <div className="tableWrap"><table><thead><tr><th>Funcionário</th><th>Data</th><th>Entrada extra</th><th>Saída extra</th><th>Duração</th><th>Referência</th><th>Status</th></tr></thead>
-            <tbody>{report?.extra_rows?.length?report.extra_rows.map((x,i)=><tr key={i}><td>{x.employee_name}</td><td>{formatDate(x.start_date)}</td><td>{String(x.start_time).slice(0,5)}</td><td>{extraEnd(x)}</td><td>{x.minutes==null?"—":fmt(x.minutes)}</td><td>{x.description??"—"}</td><td>{x.open?"EM ANDAMENTO":"CONCLUÍDA"}</td></tr>):<tr><td colSpan={7}>Nenhuma jornada extra no período.</td></tr>}</tbody>
-          </table></div>
+
+        <div className="reportPrintRoot">
+          {report?.employee_reports?.map((employeeReport,index)=><section className="employeePrintSheet" key={employeeReport.employee_id}>
+            <header className="printReportHeader">
+              <div className="printBrand">
+                <div className="brandMark printLogo">CVT</div>
+                <div><strong>Corrente da Vida Treinamentos</strong><span>Espelho Mensal de Ponto</span></div>
+              </div>
+              <div className="printPeriod"><span>Competência</span><strong>{formatMonth(report.month)}</strong></div>
+            </header>
+
+            <div className="employeeIdentity">
+              <div><span>Funcionário</span><strong>{employeeReport.employee_name}</strong></div>
+              <div><span>CPF</span><strong>{formatCpf(employeeReport.employee_cpf)}</strong></div>
+              <div><span>Admissão</span><strong>{formatDate(employeeReport.admission_date)}</strong></div>
+            </div>
+
+            <div className="printTotals">
+              {[
+                ["Trabalhadas",fmt(employeeReport.totals.worked_minutes)],
+                ["Horas extras",fmt(employeeReport.totals.extra_minutes)],
+                ["Positivas",fmt(employeeReport.totals.positive_minutes)],
+                ["Negativas",fmt(employeeReport.totals.negative_minutes)],
+                ["Saldo do mês",fmt(employeeReport.totals.balance_minutes,true)]
+              ].map(([label,value])=><div key={String(label)}><span>{label}</span><strong>{value}</strong></div>)}
+            </div>
+
+            <div className="tableWrap printTableWrap">
+              <table className="monthlyPunchTable">
+                <thead><tr><th>Data</th><th>Dia</th><th>Entrada</th><th>Intervalo</th><th>Saída</th><th>Trabalhado</th><th>H. extra</th><th>Débito</th><th>Saldo dia</th><th>Situação / observação</th></tr></thead>
+                <tbody>{employeeReport.rows.map((r:any)=><tr key={r.date} className={r.status==="FIM DE SEMANA"?"mutedDay":""}>
+                  <td>{formatDate(r.date)}</td>
+                  <td>{r.weekday}</td>
+                  <td>{r.entrada?String(r.entrada).slice(0,5):"—"}</td>
+                  <td>{intervalText(r)}</td>
+                  <td>{r.saida?String(r.saida).slice(0,5):"—"}</td>
+                  <td>{fmt(r.worked_minutes)}</td>
+                  <td>{r.extra_minutes?fmt(r.extra_minutes):"—"}</td>
+                  <td>{r.bank_debit_minutes?fmt(r.bank_debit_minutes):"—"}</td>
+                  <td>{fmt(r.daily_balance_minutes,true)}</td>
+                  <td className="statusCell"><strong>{r.status}</strong>{r.details&&<span>{r.details}</span>}</td>
+                </tr>)}</tbody>
+              </table>
+            </div>
+
+            <div className="employeeSignature">
+              <p>Declaro que conferi os registros de jornada e os saldos apresentados neste relatório mensal.</p>
+              <div className="signatureLine"></div>
+              <strong>{employeeReport.employee_name}</strong>
+              <span>Assinatura do funcionário</span>
+            </div>
+
+            <footer className="printReportFooter">
+              <span>Corrente da Vida Treinamentos — CVT</span>
+              <span>Documento para conferência mensal do funcionário</span>
+            </footer>
+          </section>)}
         </div>
       </>}
     </main>
