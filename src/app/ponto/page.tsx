@@ -150,6 +150,8 @@ export default function Ponto(){
     <section className="employeeMetrics">
       {[
         ["Horas trabalhadas",fmt(data?.totals.worked_minutes)],
+        ["Positivo normal",fmt(data?.totals.normal_positive_minutes)],
+        ["Crédito jornada extra",fmt(data?.totals.bank_credit_minutes)],
         ["Horas positivas",fmt(data?.totals.positive_minutes)],
         ["Horas negativas",fmt(data?.totals.negative_minutes)],
         ["Saldo",fmt(data?.totals.balance_minutes,true)]
