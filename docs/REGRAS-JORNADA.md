@@ -59,17 +59,19 @@ A folga consome saldo do banco de horas no momento em que é cadastrada. Se não
 - Se existir apenas Entrada, ou uma sequência parcial de intervalo, a jornada continua incompleta até haver registros suficientes.
 
 ## Jornada extra
-- É separada da jornada normal.
+- O registro é manual e sempre depende de aprovação administrativa.
+- O funcionário informa data/hora de entrada, data/hora de saída e a referência/motivo do trabalho extra.
+- A solicitação fica PENDENTE e não altera o banco de horas enquanto aguarda análise.
+- O administrador pode APROVAR ou REJEITAR.
+- Somente solicitações APROVADAS entram como horas trabalhadas, horas positivas e saldo.
 - Usa somente Entrada Extra → Saída Extra, sem intervalo.
-- Os horários são registrados pelo servidor; o funcionário não escolhe manualmente a hora.
-- Pode atravessar a meia-noite. Exemplo: 22:15 → 03:00 = 4h45.
-- Uma única jornada extra pode ficar aberta por funcionário.
-- Enquanto a jornada extra estiver aberta, o ponto normal fica bloqueado para evitar sobreposição.
-- A duração completa da jornada extra entra como horas trabalhadas e como horas positivas.
-- A jornada normal do dia continua com sua previsão própria; a jornada extra não altera as 8h previstas.
-- Para fechamento mensal, a jornada extra pertence ao mês/data em que a Entrada Extra foi registrada.
-- A referência do treinamento/empresa pode ser informada opcionalmente, por exemplo: Treinamento Karsten.
-- Esta regra registra minutos extras no banco de horas; não calcula adicional remuneratório, adicional noturno ou percentuais de folha.
+- Pode atravessar a meia-noite. Exemplo: 22:15 em um dia → 03:00 no dia seguinte = 4h45.
+- A jornada extra não altera as 8h previstas da jornada normal.
+- O período informado não pode estar no futuro nem ultrapassar 24h.
+- Para fechamento mensal, a jornada extra pertence ao mês/data da Entrada Extra.
+- Solicitações sobrepostas pendentes/aprovadas são bloqueadas para evitar duplicidade.
+- Esta regra registra minutos positivos no banco de horas; não calcula adicional remuneratório, adicional noturno ou percentuais de folha.
+- Registros legados concluídos continuam preservados. Registros legados incompletos não entram nos totais.
 
 ## Dias sem registro
 - Um dia útil sem ponto e sem ocorrência continua como SEM REGISTRO.
