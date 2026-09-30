@@ -302,7 +302,7 @@ export default function Admin(){
             <label>Funcionário<select name="employeeId" required>{employees.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></label>
             <label>Data<input name="date" type="date" required /></label>
             <label>Tipo<select value={occType} onChange={e=>{const v=e.target.value as typeof occType;setOccType(v);if(v!=="FOLGA")setOccPeriod("DIA_TODO");}}><option value="FALTA">Falta — desconta 8h</option><option value="FOLGA">Folga</option><option value="ATESTADO">Atestado — não desconta</option></select></label>
-            {occType==="FOLGA"&&<label>Período<select value={occPeriod} onChange={e=>setOccPeriod(e.target.value as typeof occPeriod)}><option value="DIA_TODO">Dia todo — 0h previstas</option><option value="MANHA">Somente manhã — trabalha 4h</option><option value="TARDE">Somente tarde — trabalha 4h</option></select></label>}
+            {occType==="FOLGA"&&<label>Período<select value={occPeriod} onChange={e=>setOccPeriod(e.target.value as typeof occPeriod)}><option value="DIA_TODO">Dia todo — 0h previstas</option><option value="MANHA">Folga de manhã — trabalha à tarde (4h)</option><option value="TARDE">Folga à tarde — trabalha de manhã (4h)</option></select></label>}
             <label>Observação<input name="note" maxLength={240} placeholder="Opcional" /></label>
             <div className="formAction"><button className="primary">SALVAR OCORRÊNCIA</button></div>
           </form>
