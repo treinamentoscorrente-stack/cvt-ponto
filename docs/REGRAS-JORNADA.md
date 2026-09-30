@@ -13,22 +13,29 @@
 - Não pode ser lançada em fim de semana ou feriado, pois nesses dias não há jornada prevista.
 
 ## Folga
+A folga consome saldo do banco de horas no momento em que é cadastrada. Se não houver saldo positivo suficiente, o banco passa a ficar negativo.
+
 ### Dia todo
-- Jornada prevista: 0h.
-- Sem batidas: saldo 0.
-- Se houver trabalho e a folga for mantida, as horas trabalhadas ficam positivas.
+- Débito no banco de horas: 8h em um dia útil normal.
+- O ponto normal fica bloqueado.
+- Não há jornada normal prevista para ser registrada naquele dia.
+- Exemplo: saldo anterior +6h e folga integral de 8h → novo saldo -2h.
 
 ### Folga de manhã
-- O funcionário está dispensado pela manhã e trabalha somente a outra metade da jornada.
-- Jornada prevista: 4h em um dia útil normal.
-- Fluxo do ponto do funcionário: Entrada → Saída.
-- Saldo = horas trabalhadas - 4h.
+- Débito no banco de horas: 4h em um dia útil normal.
+- O funcionário trabalha somente à tarde.
+- Jornada de trabalho esperada no período trabalhado: 4h.
+- Fluxo do ponto: Entrada → Saída.
+- Se trabalhar exatamente 4h, o saldo do dia permanece com o débito de -4h da folga.
+- Horas trabalhadas acima ou abaixo das 4h compensam ou aumentam a diferença normalmente.
 
 ### Folga à tarde
-- O funcionário trabalha somente a primeira metade da jornada e está dispensado à tarde.
-- Jornada prevista: 4h em um dia útil normal.
-- Fluxo do ponto do funcionário: Entrada → Saída.
-- Saldo = horas trabalhadas - 4h.
+- Débito no banco de horas: 4h em um dia útil normal.
+- O funcionário trabalha somente de manhã.
+- Jornada de trabalho esperada no período trabalhado: 4h.
+- Fluxo do ponto: Entrada → Saída.
+- Se trabalhar exatamente 4h, o saldo do dia permanece com o débito de -4h da folga.
+- Horas trabalhadas acima ou abaixo das 4h compensam ou aumentam a diferença normalmente.
 
 ## Atestado
 - Nesta primeira versão, o atestado cobre o dia inteiro.
@@ -64,7 +71,8 @@
 ## Relatórios
 - Jornadas extras aparecem separadamente e também são somadas aos totais de horas trabalhadas, horas positivas e saldo.
 - Falta entra nas horas negativas.
-- Atestado e folga integral não geram débito.
-- Folga parcial usa 4h previstas.
+- Atestado não gera débito.
+- Folga integral debita 8h do banco em dia útil normal.
+- Folga parcial debita 4h do banco e mantém 4h de jornada no período trabalhado.
 - Feriado usa 0h previstas.
 - Trabalho em feriado ou folga integral pode gerar saldo positivo.
