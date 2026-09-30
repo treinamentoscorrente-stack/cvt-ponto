@@ -5,6 +5,7 @@
 - Sábado e domingo: 0h previstas.
 - Feriado: 0h previstas.
 - Dia comum completo: Entrada → Início intervalo → Fim intervalo → Saída.
+- Quando não houver intervalo, o sistema aceita Entrada → Saída e contabiliza todo o período entre os dois horários como trabalhado.
 
 ## Falta
 - Sempre corresponde ao dia inteiro.
@@ -49,6 +50,13 @@ A folga consome saldo do banco de horas no momento em que é cadastrada. Se não
 - O motivo do ajuste é obrigatório.
 - A auditoria registra funcionário, data, motivo, valores anteriores e valores novos.
 - Horários informados devem respeitar ordem crescente.
+
+## Jornada sem intervalo
+- Pode ser registrada somente com Entrada → Saída.
+- Todo o período entre os dois horários é considerado trabalhado.
+- Exemplo: 06:20 → 20:00 = 13h40 trabalhadas.
+- Em uma jornada prevista de 8h, esse exemplo gera +5h40 de saldo positivo.
+- Se existir apenas Entrada, ou uma sequência parcial de intervalo, a jornada continua incompleta até haver registros suficientes.
 
 ## Jornada extra
 - É separada da jornada normal.
