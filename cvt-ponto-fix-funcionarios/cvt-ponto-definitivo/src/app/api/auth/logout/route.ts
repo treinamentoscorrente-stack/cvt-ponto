@@ -1,0 +1,2 @@
+import { NextResponse } from "next/server";import { clearSession,getSession,validCsrf } from "@/lib/auth";import { jsonError } from "@/lib/http";import { assertSameOrigin } from "@/lib/security";
+export const runtime="nodejs";export async function POST(request:Request){try{assertSameOrigin(request);const s=await getSession();if(s&&!validCsrf(request,s))return jsonError("Token de segurança inválido.",403);await clearSession();return NextResponse.json({ok:true})}catch{return jsonError("Requisição inválida.",400)}}

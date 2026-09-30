@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cvt_ponto
+      POSTGRES_USER: cvt
+      POSTGRES_PASSWORD: cvt_local_only
+    ports:
+      - "5432:5432"
+    volumes:
+      - cvt_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cvt -d cvt_ponto"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  cvt_pgdata:
