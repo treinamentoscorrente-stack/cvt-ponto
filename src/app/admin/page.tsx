@@ -482,7 +482,7 @@ export default function Admin(){
         <div className="panel noPrint">
           <p className="eyebrow">CONFERÊNCIA MENSAL</p>
           <h2>Espelho mensal de ponto</h2>
-          <p className="serverNote">O PDF apresenta todos os dias já transcorridos do mês, incluindo jornadas, folgas, faltas, atestados, feriados, fins de semana e horas extras aprovadas.</p>
+          <p className="serverNote">O PDF apresenta todos os dias já transcorridos do mês, incluindo jornadas, folgas, faltas, atestados, feriados, fins de semana e jornadas extras aprovadas como saldo positivo.</p>
           <div className="reportTools">
             <label>Funcionário<select value={reportEmp} onChange={e=>setReportEmp(e.target.value)}><option value="ALL">Todos os funcionários</option>{employees.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></label>
             <label>Mês<input type="month" value={month} onChange={e=>setMonth(e.target.value)} /></label>
