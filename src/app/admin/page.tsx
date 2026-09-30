@@ -278,15 +278,15 @@ export default function Admin(){
   function exportCsv(){
     if(!report)return;
     const safe=(v:any)=>{let t=String(v??"");if(/^[=+\-@]/.test(t))t="'"+t;return `"${t.replaceAll('"','""')}"`;};
-    const header=["Funcionário","Data","Tipo","Entrada","Início intervalo","Fim intervalo","Saída","Trabalhado","Previsto","Saldo","Status","Observação"];
+    const header=["Funcionário","Data","Tipo","Entrada","Início intervalo","Fim intervalo","Saída","Trabalhado","Previsto","Débito banco","Saldo","Status","Observação"];
     const lines=[header.map(safe).join(";")];
     for(const r of report.rows)lines.push([
       r.employee_name,formatDate(r.date),"Jornada normal",r.entrada,r.intervalo_inicio,r.intervalo_fim,r.saida,
-      fmt(r.worked_minutes),fmt(r.expected_minutes),fmt(r.balance_minutes,true),r.status,r.note??r.holiday_description??""
+      fmt(r.worked_minutes),fmt(r.expected_minutes),fmt(r.bank_debit_minutes),fmt(r.balance_minutes,true),r.status,r.note??r.holiday_description??""
     ].map(safe).join(";"));
     for(const x of report.extra_rows||[])lines.push([
       x.employee_name,formatDate(x.start_date),"Jornada extra",String(x.start_time).slice(0,5),"—","—",extraEnd(x),
-      x.minutes==null?"—":fmt(x.minutes),"00h00",x.minutes==null?"—":fmt(x.minutes,true),
+      x.minutes==null?"—":fmt(x.minutes),"00h00","00h00",x.minutes==null?"—":fmt(x.minutes,true),
       x.open?"EM ANDAMENTO":"JORNADA EXTRA",x.description??""
     ].map(safe).join(";"));
     const b=new Blob(["\ufeff"+lines.join("\r\n")],{type:"text/csv;charset=utf-8"});
@@ -358,8 +358,8 @@ export default function Admin(){
           <form className="formGrid" onSubmit={saveOccurrence}>
             <label>Funcionário<select name="employeeId" required>{employees.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></label>
             <label>Data<input name="date" type="date" required /></label>
-            <label>Tipo<select value={occType} onChange={e=>{const v=e.target.value as typeof occType;setOccType(v);if(v!=="FOLGA")setOccPeriod("DIA_TODO");}}><option value="FALTA">Falta — desconta 8h</option><option value="FOLGA">Folga</option><option value="ATESTADO">Atestado — não desconta</option></select></label>
-            {occType==="FOLGA"&&<label>Período<select value={occPeriod} onChange={e=>setOccPeriod(e.target.value as typeof occPeriod)}><option value="DIA_TODO">Dia todo — 0h previstas</option><option value="MANHA">Folga de manhã — trabalha à tarde (4h)</option><option value="TARDE">Folga à tarde — trabalha de manhã (4h)</option></select></label>}
+            <label>Tipo<select value={occType} onChange={e=>{const v=e.target.value as typeof occType;setOccType(v);if(v!=="FOLGA")setOccPeriod("DIA_TODO");}}><option value="FALTA">Falta — desconta 8h</option><option value="FOLGA">Folga — debita banco de horas</option><option value="ATESTADO">Atestado — não desconta</option></select></label>
+            {occType==="FOLGA"&&<label>Período<select value={occPeriod} onChange={e=>setOccPeriod(e.target.value as typeof occPeriod)}><option value="DIA_TODO">Dia todo — debita 8h do banco</option><option value="MANHA">Folga de manhã — debita 4h / trabalha à tarde</option><option value="TARDE">Folga à tarde — debita 4h / trabalha de manhã</option></select></label>}
             <label>Observação<input name="note" maxLength={240} placeholder="Opcional" /></label>
             <div className="formAction"><button className="primary">SALVAR OCORRÊNCIA</button></div>
           </form>
@@ -428,8 +428,8 @@ export default function Admin(){
           <div className="reportHeader"><div><p className="eyebrow">RELATÓRIO MENSAL DE HORAS</p><h2>{formatMonth(report?.month)}</h2><span>{report?.employee_label??""}</span></div><strong>Corrente da Vida Treinamentos — CVT</strong></div>
           <div className="reportSummary">{[["Trabalhadas",fmt(report?.totals.worked_minutes)],["Horas extras",fmt(report?.totals.extra_minutes)],["Positivas",fmt(report?.totals.positive_minutes)],["Negativas",fmt(report?.totals.negative_minutes)],["Saldo",fmt(report?.totals.balance_minutes,true)],["Pendências",report?.totals.pending??0]].map(([l,v])=><article className="metric" key={String(l)}><span>{l}</span><strong>{v}</strong></article>)}</div>
           <h2>Jornada normal</h2>
-          <div className="tableWrap"><table><thead><tr><th>Funcionário</th><th>Data</th><th>Entrada</th><th>Início intervalo</th><th>Fim intervalo</th><th>Saída</th><th>Trabalhado</th><th>Previsto</th><th>Saldo</th><th>Status</th><th>Observação</th></tr></thead>
-            <tbody>{report?.rows.map((r,i)=><tr key={i}><td>{r.employee_name}</td><td>{formatDate(r.date)}</td><td>{r.entrada??"—"}</td><td>{r.intervalo_inicio??"—"}</td><td>{r.intervalo_fim??"—"}</td><td>{r.saida??"—"}</td><td>{fmt(r.worked_minutes)}</td><td>{fmt(r.expected_minutes)}</td><td>{fmt(r.balance_minutes,true)}</td><td>{r.status}</td><td>{r.note??r.holiday_description??"—"}</td></tr>)}</tbody>
+          <div className="tableWrap"><table><thead><tr><th>Funcionário</th><th>Data</th><th>Entrada</th><th>Início intervalo</th><th>Fim intervalo</th><th>Saída</th><th>Trabalhado</th><th>Previsto</th><th>Débito banco</th><th>Saldo</th><th>Status</th><th>Observação</th></tr></thead>
+            <tbody>{report?.rows.map((r,i)=><tr key={i}><td>{r.employee_name}</td><td>{formatDate(r.date)}</td><td>{r.entrada??"—"}</td><td>{r.intervalo_inicio??"—"}</td><td>{r.intervalo_fim??"—"}</td><td>{r.saida??"—"}</td><td>{fmt(r.worked_minutes)}</td><td>{fmt(r.expected_minutes)}</td><td>{fmt(r.bank_debit_minutes)}</td><td>{fmt(r.balance_minutes,true)}</td><td>{r.status}</td><td>{r.note??r.holiday_description??"—"}</td></tr>)}</tbody>
           </table></div>
           <h2>Jornadas extras</h2>
           <div className="tableWrap"><table><thead><tr><th>Funcionário</th><th>Data</th><th>Entrada extra</th><th>Saída extra</th><th>Duração</th><th>Referência</th><th>Status</th></tr></thead>
