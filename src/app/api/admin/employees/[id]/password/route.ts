@@ -36,6 +36,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       }
 
       await client.query("DELETE FROM sessions WHERE role='employee' AND user_id=$1", [employeeId]);
+      await client.query("DELETE FROM login_attempts");
       await client.query(
         "INSERT INTO audit_log(actor_role,actor_id,action,details,ip_address) VALUES('admin',$1,'employee_password_reset',$2::jsonb,$3)",
         [auth.session.userId, JSON.stringify({ employeeId }), clientIp(request)]
