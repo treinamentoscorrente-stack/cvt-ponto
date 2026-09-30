@@ -15,6 +15,12 @@ function weekday(date:string){
   return WEEKDAYS[new Date(Date.UTC(y,m-1,d)).getUTCDay()];
 }
 
+function hm(minutes:number){
+  const sign=minutes<0?"-":"+";
+  const a=Math.abs(minutes);
+  return `${sign}${String(Math.floor(a/60)).padStart(2,"0")}h${String(a%60).padStart(2,"0")}`;
+}
+
 export async function GET(request:Request){
   const auth=await requireSession("admin");
   if(!auth.ok)return jsonError(auth.error,auth.status);
@@ -61,7 +67,7 @@ export async function GET(request:Request){
         const details:string[]=[];
         if(day.holiday_description)details.push(day.holiday_description);
         if(day.note)details.push(day.note);
-        if(extra.minutes>0)details.push(`Hora extra aprovada: ${extra.descriptions.join(", ")||"sem referência"}`);
+        if(extra.minutes>0)details.push(`Jornada extra aprovada ${hm(extra.minutes)} no banco: ${extra.descriptions.join(", ")||"sem referência"}`);
 
         return {
           employee_id:id,
