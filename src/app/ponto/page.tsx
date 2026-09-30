@@ -86,10 +86,10 @@ export default function Ponto(){
         end_date:extraEndDate,end_time:extraEndTime,
         description:extraDescription,
       })});
-      setNotice(`Horas extras enviadas para aprovação: ${fmt(result.minutes)}.`);
+      setNotice(`Jornada extra enviada para aprovação: ${fmt(result.minutes)}. Após aprovação, entra como saldo positivo no banco.`);
       setExtraStartTime("");setExtraEndTime("");setExtraDescription("");
       await loadExtraRequests();
-    }catch(e){setError(e instanceof Error?e.message:"Erro ao enviar horas extras.");}
+    }catch(e){setError(e instanceof Error?e.message:"Erro ao enviar jornada extra.");}
     finally{setExtraBusy(false);}
   }
 
@@ -150,7 +150,6 @@ export default function Ponto(){
     <section className="employeeMetrics">
       {[
         ["Horas trabalhadas",fmt(data?.totals.worked_minutes)],
-        ["Horas extras aprovadas",fmt(data?.totals.extra_minutes)],
         ["Horas positivas",fmt(data?.totals.positive_minutes)],
         ["Horas negativas",fmt(data?.totals.negative_minutes)],
         ["Saldo",fmt(data?.totals.balance_minutes,true)]
@@ -165,7 +164,7 @@ export default function Ponto(){
 
     <section className="panel">
       <div className="sectionHead">
-        <div><p className="eyebrow">HORAS EXTRAS</p><h2>Solicitar registro manual</h2></div>
+        <div><p className="eyebrow">JORNADA EXTRA</p><h2>Solicitar crédito no banco de horas</h2></div>
         <span className="badge">Sujeito à aprovação</span>
       </div>
       <form className="formGrid" onSubmit={requestExtra}>
@@ -174,22 +173,22 @@ export default function Ponto(){
         <label>Data da saída<input type="date" value={extraEndDate} max={todaySP()} onChange={e=>setExtraEndDate(e.target.value)} required /></label>
         <label>Hora da saída<input type="time" value={extraEndTime} onChange={e=>setExtraEndTime(e.target.value)} required /></label>
         <label>Referência / motivo<input value={extraDescription} onChange={e=>setExtraDescription(e.target.value)} minLength={3} maxLength={160} placeholder="Ex.: Treinamento Karsten" required /></label>
-        <div className="formAction"><button className="primary" disabled={extraBusy}>{extraBusy?"ENVIANDO...":"ENVIAR HORAS EXTRAS PARA APROVAÇÃO"}</button></div>
+        <div className="formAction"><button className="primary" disabled={extraBusy}>{extraBusy?"ENVIANDO...":"ENVIAR JORNADA EXTRA PARA APROVAÇÃO"}</button></div>
       </form>
-      <p className="serverNote">Exemplo: entrada 22:15 em 29/09 e saída 03:00 em 30/09. As horas só entram no banco depois da aprovação da CVT.</p>
+      <p className="serverNote">Exemplo: entrada 22:15 em 29/09 e saída 03:00 em 30/09. O período aprovado entra integralmente como saldo positivo no banco de horas.</p>
     </section>
 
     <section className="panel tableWrap">
-      <h2>Minhas solicitações de horas extras</h2>
+      <h2>Minhas solicitações de jornada extra</h2>
       <table><thead><tr><th>Entrada</th><th>Saída</th><th>Duração</th><th>Referência</th><th>Status</th><th>Retorno</th></tr></thead>
         <tbody>{extraRequests.length?extraRequests.map((x:any)=><tr key={x.id}><td>{formatDate(x.start_date)} {String(x.start_time).slice(0,5)}</td><td>{formatDate(x.end_date)} {String(x.end_time).slice(0,5)}</td><td>{fmt(Number(x.minutes))}</td><td>{x.description}</td><td>{statusLabel(x.status)}</td><td>{x.review_note??"—"}</td></tr>):<tr><td colSpan={6}>Nenhuma solicitação enviada.</td></tr>}</tbody>
       </table>
     </section>
 
     <section className="panel tableWrap">
-      <h2>Horas extras aprovadas</h2>
+      <h2>Jornadas extras aprovadas</h2>
       <table><thead><tr><th>Data</th><th>Entrada</th><th>Saída</th><th>Duração</th><th>Referência</th></tr></thead>
-        <tbody>{data?.recent_extra?.length?data.recent_extra.map((x:any)=><tr key={x.id}><td>{formatDate(x.start_date)}</td><td>{String(x.start_time).slice(0,5)}</td><td>{extraEnd(x)}</td><td>{fmt(x.minutes)}</td><td>{x.description??"—"}</td></tr>):<tr><td colSpan={5}>Nenhuma hora extra aprovada.</td></tr>}</tbody>
+        <tbody>{data?.recent_extra?.length?data.recent_extra.map((x:any)=><tr key={x.id}><td>{formatDate(x.start_date)}</td><td>{String(x.start_time).slice(0,5)}</td><td>{extraEnd(x)}</td><td>{fmt(x.minutes)}</td><td>{x.description??"—"}</td></tr>):<tr><td colSpan={5}>Nenhuma jornada extra aprovada.</td></tr>}</tbody>
       </table>
     </section>
 
