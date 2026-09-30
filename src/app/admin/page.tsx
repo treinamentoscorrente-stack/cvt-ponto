@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Emp = { id:number; name:string; cpf:string; admission_date:string; status:"ATIVO"|"INATIVO"; login:string };
-type Totals = { worked_minutes:number; positive_minutes:number; negative_minutes:number; balance_minutes:number; pending:number; extra_minutes:number };
+type Totals = { worked_minutes:number; positive_minutes:number; normal_positive_minutes:number; bank_credit_minutes:number; negative_minutes:number; balance_minutes:number; pending:number; extra_minutes:number };
 type Dash = { total:number; active:number; inactive:number; totals:Totals; employees:Array<{id:number;name:string;login:string;status:string;totals:Totals;today_status:string}> };
 type EmployeeReport = { employee_id:number; employee_name:string; employee_cpf:string; admission_date:string; totals:Totals; rows:Array<any> };
 type Report = { month:string; employee_label:string; totals:Totals; rows:Array<any>; extra_rows:Array<any>; employee_reports:Array<EmployeeReport> };
@@ -14,7 +14,7 @@ type AdjustmentRequest = { id:number; employee_id:number; employee_name:string; 
 type ExtraWorkRequest = { id:number; employee_id:number; employee_name:string; start_date:string; start_time:string; end_date:string; end_time:string; minutes:number; description:string; status:"PENDENTE"|"APROVADO"|"REJEITADO"; review_note:string|null; created_at:string; reviewed_at:string|null };
 type View = "dashboard"|"employees"|"occurrences"|"adjustments"|"requests"|"extraRequests"|"holidays"|"report";
 
-const emptyTotals:Totals = {worked_minutes:0,positive_minutes:0,negative_minutes:0,balance_minutes:0,pending:0,extra_minutes:0};
+const emptyTotals:Totals = {worked_minutes:0,positive_minutes:0,normal_positive_minutes:0,bank_credit_minutes:0,negative_minutes:0,balance_minutes:0,pending:0,extra_minutes:0};
 const fmt=(n:number|null|undefined,s=false)=>{
   if(n==null)return "—";
   const sign=n<0?"-":s&&n>0?"+":"";
@@ -369,12 +369,13 @@ export default function Admin(){
         <div className="metrics">
           {[
             ["Funcionários",dash?.total??0],["Ativos",dash?.active??0],["Horas trabalhadas",fmt(totals.worked_minutes)],
+            ["Positivo normal",fmt(totals.normal_positive_minutes)],["Crédito jornada extra",fmt(totals.bank_credit_minutes)],
             ["Horas positivas",fmt(totals.positive_minutes)],["Horas negativas",fmt(totals.negative_minutes)],
             ["Saldo",fmt(totals.balance_minutes,true)]
           ].map(([l,v])=><article className="metric" key={String(l)}><span>{l}</span><strong>{v}</strong></article>)}
         </div>
-        <div className="panel tableWrap"><table><thead><tr><th>Funcionário</th><th>Usuário</th><th>Trabalhado</th><th>Positivas</th><th>Negativas</th><th>Saldo</th><th>Status hoje</th></tr></thead>
-          <tbody>{dash?.employees.map(e=><tr key={e.id}><td>{e.name}</td><td>{e.login}</td><td>{fmt(e.totals.worked_minutes)}</td><td>{fmt(e.totals.positive_minutes)}</td><td>{fmt(e.totals.negative_minutes)}</td><td>{fmt(e.totals.balance_minutes,true)}</td><td>{e.today_status}</td></tr>)}</tbody>
+        <div className="panel tableWrap"><table><thead><tr><th>Funcionário</th><th>Usuário</th><th>Trabalhado</th><th>Positivo normal</th><th>Crédito extra</th><th>Positivas</th><th>Negativas</th><th>Saldo</th><th>Status hoje</th></tr></thead>
+          <tbody>{dash?.employees.map(e=><tr key={e.id}><td>{e.name}</td><td>{e.login}</td><td>{fmt(e.totals.worked_minutes)}</td><td>{fmt(e.totals.normal_positive_minutes)}</td><td>{fmt(e.totals.bank_credit_minutes)}</td><td>{fmt(e.totals.positive_minutes)}</td><td>{fmt(e.totals.negative_minutes)}</td><td>{fmt(e.totals.balance_minutes,true)}</td><td>{e.today_status}</td></tr>)}</tbody>
         </table></div>
       </>}
 
