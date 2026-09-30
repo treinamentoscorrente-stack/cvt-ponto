@@ -510,6 +510,8 @@ export default function Admin(){
             <div className="printTotals">
               {[
                 ["Trabalhadas",fmt(employeeReport.totals.worked_minutes)],
+                ["Positivo normal",fmt(employeeReport.totals.normal_positive_minutes)],
+                ["Crédito jornada extra",fmt(employeeReport.totals.bank_credit_minutes)],
                 ["Positivas",fmt(employeeReport.totals.positive_minutes)],
                 ["Negativas",fmt(employeeReport.totals.negative_minutes)],
                 ["Saldo do mês",fmt(employeeReport.totals.balance_minutes,true)]
