@@ -17,13 +17,14 @@ export async function GET() {
     [auth.session.userId],
   )).rows[0];
 
-  const [summaries, extraSessions, extraMinutes] = await Promise.all([
-    summariesForEmployee(auth.session.userId),
-    extraSessionsForEmployee(auth.session.userId),
-    extraMinutesForEmployee(auth.session.userId),
-  ]);
-
   const now = saoPauloNow();
+  const currentMonth = now.date.slice(0,7);
+  const [summaries, recentSummaries, extraSessions, extraMinutes] = await Promise.all([
+    summariesForEmployee(auth.session.userId, currentMonth),
+    summariesForEmployee(auth.session.userId),
+    extraSessionsForEmployee(auth.session.userId, currentMonth),
+    extraMinutesForEmployee(auth.session.userId, currentMonth),
+  ]);
   const today = await summaryForDate(auth.session.userId, now.date);
   const nextType = await nextPunchType(auth.session.userId, now.date);
   return NextResponse.json({
@@ -33,6 +34,6 @@ export async function GET() {
     next_type: nextType,
     recent_extra: extraSessions.slice(0,10),
     totals: totalsWithExtra(aggregate(summaries), extraMinutes),
-    recent: summaries.slice(0,10),
+    recent: recentSummaries.slice(0,10),
   }, { headers: { "cache-control": "no-store" } });
 }
