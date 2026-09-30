@@ -5,6 +5,8 @@ import { autoTable } from "jspdf-autotable";
 
 type Totals={
   worked_minutes:number;
+  normal_positive_minutes:number;
+  bank_credit_minutes:number;
   positive_minutes:number;
   negative_minutes:number;
   balance_minutes:number;
@@ -110,12 +112,14 @@ function drawHeader(doc:jsPDF,employee:EmployeeReport,month:string){
 
   const cards=[
     ["Trabalhadas",fmt(employee.totals.worked_minutes)],
+    ["Positivo normal",fmt(employee.totals.normal_positive_minutes)],
+    ["Credito jornada extra",fmt(employee.totals.bank_credit_minutes)],
     ["Positivas",fmt(employee.totals.positive_minutes)],
     ["Negativas",fmt(employee.totals.negative_minutes)],
     ["Saldo",fmt(employee.totals.balance_minutes,true)],
   ];
   const cardY=46;
-  const cardW=(pageWidth-20-9)/4;
+  const cardW=(pageWidth-20-15)/6;
   cards.forEach(([label,value],i)=>{
     const x=10+i*(cardW+3);
     doc.setFillColor(248,249,250);
