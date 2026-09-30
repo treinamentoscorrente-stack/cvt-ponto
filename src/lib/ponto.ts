@@ -307,7 +307,17 @@ export async function summariesForEmployee(employeeId: number, month?: string) {
 
 export function aggregate(items: DaySummary[]) {
   let worked = 0, positive = 0, negative = 0, pending = 0;
+  const today = saoPauloNow().date;
+  const currentMonth = today.slice(0,7);
+
   for (const s of items) {
+    const isFutureFolgaOutsideCurrentMonth =
+      s.occurrence_type === "FOLGA"
+      && s.date > today
+      && s.date.slice(0,7) !== currentMonth;
+
+    if (isFutureFolgaOutsideCurrentMonth) continue;
+
     worked += s.worked_minutes ?? 0;
     if ((s.balance_minutes ?? 0) > 0) positive += s.balance_minutes!;
     if ((s.balance_minutes ?? 0) < 0) negative += Math.abs(s.balance_minutes!);
