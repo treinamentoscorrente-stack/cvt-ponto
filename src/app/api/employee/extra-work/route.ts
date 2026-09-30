@@ -120,6 +120,6 @@ export async function POST(request:Request){
       throw e;
     }finally{client.release();}
   }catch{
-    return jsonError("Não foi possível enviar a solicitação de horas extras.",400);
+    return jsonError("Não foi possível enviar a solicitação de jornada extra.",400);
   }
 }
