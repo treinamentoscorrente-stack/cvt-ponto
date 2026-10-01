@@ -1,20 +1,22 @@
 import { NextResponse } from "next/server";
-import { requireSession, validCsrf } from "@/lib/auth";
+import { requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { expectedPunchTypes, type DayOccurrence } from "@/lib/ponto";
 import { saoPauloNow } from "@/lib/time";
 import { jsonError } from "@/lib/http";
-import { assertSameOrigin, clientIp } from "@/lib/security";
+import { clientIp } from "@/lib/security";
 import { audit } from "@/lib/audit";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
-    assertSameOrigin(request);
+    const origin = request.headers.get("origin");
+    const requestOrigin = new URL(request.url).origin;
+    if (!origin || origin !== requestOrigin) return jsonError("Origem inválida.", 403);
+
     const auth = await requireSession("employee");
     if (!auth.ok) return jsonError(auth.error, auth.status);
-    if (!validCsrf(request, auth.session)) return jsonError("Token de segurança inválido.", 403);
 
     const now = saoPauloNow();
     const client = await db.connect();
