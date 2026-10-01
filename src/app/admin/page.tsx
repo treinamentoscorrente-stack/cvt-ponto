@@ -82,6 +82,7 @@ export default function Admin(){
   const [notice,setNotice]=useState("");
   const [report,setReport]=useState<Report|null>(null);
   const [downloadingPdf,setDownloadingPdf]=useState(false);
+  const [downloadingTimecard,setDownloadingTimecard]=useState(false);
   const [reportEmp,setReportEmp]=useState("ALL");
   const [month,setMonth]=useState(()=>todaySP().slice(0,7));
   const [passwordEmp,setPasswordEmp]=useState<Emp|null>(null);
@@ -321,6 +322,18 @@ export default function Admin(){
     }finally{setDownloadingPdf(false);}
   }
 
+  async function downloadTimecard(){
+    if(reportEmp==="ALL"||downloadingTimecard)return;
+    setDownloadingTimecard(true);setError("");
+    try{
+      const fresh=await api(`/api/admin/report?employeeId=${encodeURIComponent(reportEmp)}&month=${encodeURIComponent(month)}`);
+      const {downloadTimecardPdf}=await import("@/lib/timecard-pdf");
+      downloadTimecardPdf(fresh);
+    }catch(e){
+      setError(e instanceof Error?e.message:"Não foi possível gerar o cartão ponto.");
+    }finally{setDownloadingTimecard(false);}
+  }
+
   const totals=dash?.totals??emptyTotals;
 
   return <div className="appShell">
@@ -447,12 +460,13 @@ export default function Admin(){
         <div className="panel noPrint">
           <p className="eyebrow">CONFERÊNCIA MENSAL</p>
           <h2>Espelho mensal de ponto</h2>
-          <p className="serverNote">O PDF apresenta todos os dias já transcorridos do mês, incluindo jornadas, folgas, faltas, atestados, feriados, fins de semana e jornadas extras aprovadas como saldo positivo.</p>
+          <p className="serverNote">O relatório mensal continua analítico. O Cartão Ponto PDF é um documento separado, compacto e com somente os dias efetivamente trabalhados.</p>
           <div className="reportTools">
             <label>Funcionário<select value={reportEmp} onChange={e=>setReportEmp(e.target.value)}><option value="ALL">Todos os funcionários</option>{employees.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></label>
             <label>Mês<input type="month" value={month} onChange={e=>setMonth(e.target.value)} /></label>
-            <div className="reportActions"><button className="primary" onClick={generate}>GERAR</button><button className="secondary" onClick={exportCsv} disabled={!report}>EXCEL / CSV</button><button className="dark" onClick={downloadPdf} disabled={!report||downloadingPdf}>{downloadingPdf?"GERANDO PDF...":"BAIXAR PDF"}</button></div>
+            <div className="reportActions"><button className="primary" onClick={generate}>GERAR</button><button className="secondary" onClick={exportCsv} disabled={!report}>EXCEL / CSV</button><button className="dark" onClick={downloadPdf} disabled={!report||downloadingPdf}>{downloadingPdf?"GERANDO...":"BAIXAR RELATÓRIO PDF"}</button><button className="secondary" onClick={downloadTimecard} disabled={reportEmp==="ALL"||downloadingTimecard}>{downloadingTimecard?"GERANDO CARTÃO...":"BAIXAR CARTÃO PONTO"}</button></div>
           </div>
+          {reportEmp==="ALL"&&<p className="serverNote">Para baixar o Cartão Ponto em uma única folha, selecione um funcionário específico.</p>}
         </div>
 
         <div className="reportPrintRoot">
