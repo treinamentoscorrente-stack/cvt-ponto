@@ -89,6 +89,15 @@ export default function Admin(){
   const [newPassword,setNewPassword]=useState("");
   const [confirmPassword,setConfirmPassword]=useState("");
   const [savingEmployee,setSavingEmployee]=useState(false);
+  const [editingEmployee,setEditingEmployee]=useState<Emp|null>(null);
+  const [savingEmployeeEdit,setSavingEmployeeEdit]=useState(false);
+  const [editEmployeeForm,setEditEmployeeForm]=useState({
+    name:"",
+    cpf:"",
+    admission_date:"",
+    status:"ATIVO" as "ATIVO"|"INATIVO",
+    login:"",
+  });
 
   const [occurrences,setOccurrences]=useState<Occurrence[]>([]);
   const [occType,setOccType]=useState<"FALTA"|"FOLGA"|"ATESTADO">("FALTA");
@@ -174,6 +183,35 @@ export default function Admin(){
       setError(err instanceof Error?err.message:"Erro");
       await loadBase();
     }finally{setSavingEmployee(false);}
+  }
+
+  function startEditEmployee(emp:Emp){
+    setPasswordEmp(null);
+    setEditingEmployee(emp);
+    setEditEmployeeForm({
+      name:emp.name,
+      cpf:emp.cpf,
+      admission_date:String(emp.admission_date).slice(0,10),
+      status:emp.status,
+      login:emp.login,
+    });
+  }
+
+  async function saveEmployeeEdit(e:FormEvent<HTMLFormElement>){
+    e.preventDefault();
+    if(!editingEmployee||savingEmployeeEdit)return;
+    setError("");setNotice("");setSavingEmployeeEdit(true);
+    try{
+      await api(`/api/admin/employees/${editingEmployee.id}`,{
+        method:"PATCH",
+        body:JSON.stringify(editEmployeeForm),
+      });
+      await loadBase();
+      setNotice(`Cadastro de ${editEmployeeForm.name} atualizado com sucesso.`);
+      setEditingEmployee(null);
+    }catch(err){
+      setError(err instanceof Error?err.message:"Erro ao atualizar funcionário.");
+    }finally{setSavingEmployeeEdit(false);}
   }
 
   async function toggle(emp:Emp){
@@ -336,8 +374,8 @@ export default function Admin(){
 
   const totals=dash?.totals??emptyTotals;
 
-  return <div className="appShell">
-    <aside className="sidebar">
+  return <div className="appShell adminShell">
+    <aside className="sidebar adminSidebar">
       <div className="sideBrand"><div className="brandMark small">CVT</div><div><strong>Controle de Ponto</strong><small>Área administrativa</small></div></div>
       <nav>
         {[
@@ -348,8 +386,8 @@ export default function Admin(){
       <button className="logout" onClick={logout}>Sair</button>
     </aside>
 
-    <main className="content">
-      <header className="topbar"><div><p className="eyebrow">CVT</p><h1>Painel Administrativo</h1></div><span className="secureBadge">Sessão protegida</span></header>
+    <main className="content adminContent">
+      <header className="topbar adminTopbar"><div><p className="eyebrow">CVT</p><h1>Painel Administrativo</h1></div><span className="secureBadge">Sessão protegida</span></header>
       {error&&<div className="alert error" onClick={()=>setError("")}>{error}</div>}
       {notice&&<div className="alert" onClick={()=>setNotice("")}>{notice}</div>}
 
@@ -367,8 +405,8 @@ export default function Admin(){
       </>}
 
       {view==="employees"&&<>
-        <div className="panel">
-          <div className="sectionHead"><div><p className="eyebrow">CADASTRO</p><h2>Novo funcionário</h2></div><span className="badge">{employees.length}/3</span></div>
+        <div className="panel adminSectionPanel">
+          <div className="sectionHead"><div><p className="eyebrow">CADASTRO</p><h2>Novo funcionário</h2></div><span className="badge">{employees.length}/3 cadastrados</span></div>
           <form className="formGrid" onSubmit={createEmployee}>
             <label>Nome<input name="name" required /></label>
             <label>CPF<input name="cpf" required /></label>
@@ -379,10 +417,30 @@ export default function Admin(){
             <div className="formAction"><button className="primary" disabled={savingEmployee||employees.length>=3}>{savingEmployee?"SALVANDO...":employees.length>=3?"LIMITE DE 3 ATINGIDO":"CADASTRAR FUNCIONÁRIO"}</button></div>
           </form>
         </div>
-        <div className="panel tableWrap"><table><thead><tr><th>Nome</th><th>Usuário</th><th>CPF</th><th>Admissão</th><th>Status</th><th>Ações</th></tr></thead>
-          <tbody>{employees.map(e=><tr key={e.id}><td>{e.name}</td><td>{e.login}</td><td>{e.cpf}</td><td>{formatDate(e.admission_date)}</td><td>{e.status}</td><td><div className="reportActions"><button className="secondary" onClick={()=>toggle(e)}>{e.status==="ATIVO"?"Inativar":"Ativar"}</button><button className="dark" onClick={()=>{setPasswordEmp(e);setNewPassword("");setConfirmPassword("");}}>Redefinir senha</button></div></td></tr>)}</tbody>
+
+        {editingEmployee&&<div className="panel adminEditPanel">
+          <div className="sectionHead">
+            <div><p className="eyebrow">EDIÇÃO DE CADASTRO</p><h2>{editingEmployee.name}</h2></div>
+            <button className="secondary" type="button" onClick={()=>setEditingEmployee(null)}>Cancelar</button>
+          </div>
+          <form className="formGrid" onSubmit={saveEmployeeEdit}>
+            <label>Nome<input value={editEmployeeForm.name} onChange={e=>setEditEmployeeForm(v=>({...v,name:e.target.value}))} required /></label>
+            <label>CPF<input value={editEmployeeForm.cpf} onChange={e=>setEditEmployeeForm(v=>({...v,cpf:e.target.value}))} required /></label>
+            <label>Data de admissão<input type="date" value={editEmployeeForm.admission_date} onChange={e=>setEditEmployeeForm(v=>({...v,admission_date:e.target.value}))} required /></label>
+            <label>Status<select value={editEmployeeForm.status} onChange={e=>setEditEmployeeForm(v=>({...v,status:e.target.value as "ATIVO"|"INATIVO"}))}><option>ATIVO</option><option>INATIVO</option></select></label>
+            <label>Usuário<input value={editEmployeeForm.login} onChange={e=>setEditEmployeeForm(v=>({...v,login:e.target.value}))} minLength={3} maxLength={40} required /></label>
+            <div className="formAction"><button className="primary" disabled={savingEmployeeEdit}>{savingEmployeeEdit?"SALVANDO...":"SALVAR ALTERAÇÕES"}</button></div>
+          </form>
+          <p className="serverNote">A senha é gerenciada separadamente pela opção “Redefinir senha”.</p>
+        </div>}
+
+        <div className="panel tableWrap adminEmployeeTable">
+          <div className="sectionHead"><div><p className="eyebrow">EQUIPE</p><h2>Funcionários cadastrados</h2></div></div>
+          <table><thead><tr><th>Nome</th><th>Usuário</th><th>CPF</th><th>Admissão</th><th>Status</th><th>Ações</th></tr></thead>
+          <tbody>{employees.map(e=><tr key={e.id}><td><strong>{e.name}</strong></td><td>{e.login}</td><td>{formatCpf(e.cpf)}</td><td>{formatDate(e.admission_date)}</td><td><span className={e.status==="ATIVO"?"statusPill active":"statusPill inactive"}>{e.status}</span></td><td><div className="reportActions adminRowActions"><button className="secondary" onClick={()=>startEditEmployee(e)}>Editar</button><button className="secondary" onClick={()=>toggle(e)}>{e.status==="ATIVO"?"Inativar":"Ativar"}</button><button className="dark" onClick={()=>{setEditingEmployee(null);setPasswordEmp(e);setNewPassword("");setConfirmPassword("");}}>Redefinir senha</button></div></td></tr>)}</tbody>
         </table></div>
-        {passwordEmp&&<div className="panel">
+
+        {passwordEmp&&<div className="panel adminPasswordPanel">
           <div className="sectionHead"><div><p className="eyebrow">SEGURANÇA</p><h2>Redefinir senha — {passwordEmp.name}</h2></div><button className="secondary" type="button" onClick={()=>setPasswordEmp(null)}>Cancelar</button></div>
           <form className="formGrid" onSubmit={resetPassword}>
             <label>Nova senha<input type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} minLength={8} maxLength={128} autoComplete="new-password" required /></label>
