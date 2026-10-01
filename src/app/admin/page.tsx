@@ -7,12 +7,11 @@ type Emp = { id:number; name:string; cpf:string; admission_date:string; status:"
 type Totals = { worked_minutes:number; positive_minutes:number; normal_positive_minutes:number; bank_credit_minutes:number; negative_minutes:number; balance_minutes:number; pending:number; extra_minutes:number };
 type Dash = { total:number; active:number; inactive:number; totals:Totals; employees:Array<{id:number;name:string;login:string;status:string;totals:Totals;today_status:string}> };
 type EmployeeReport = { employee_id:number; employee_name:string; employee_cpf:string; admission_date:string; totals:Totals; rows:Array<any> };
-type Report = { month:string; employee_label:string; totals:Totals; rows:Array<any>; extra_rows:Array<any>; employee_reports:Array<EmployeeReport> };
+type Report = { month:string; employee_label:string; totals:Totals; rows:Array<any>; employee_reports:Array<EmployeeReport> };
 type Occurrence = { id:number; employee_id:number; employee_name:string; work_date:string; occurrence_type:"FALTA"|"FOLGA"|"ATESTADO"; period:"DIA_TODO"|"MANHA"|"TARDE"; note:string|null };
 type Holiday = { id:number; holiday_date:string; description:string };
 type AdjustmentRequest = { id:number; employee_id:number; employee_name:string; work_date:string; requested_entrada:string|null; requested_intervalo_inicio:string|null; requested_intervalo_fim:string|null; requested_saida:string|null; reason:string; original_punches:Array<{punch_type:string;punch_time:string}>; status:"PENDENTE"|"APROVADO"|"REJEITADO"; review_note:string|null; created_at:string; reviewed_at:string|null };
-type ExtraWorkRequest = { id:number; employee_id:number; employee_name:string; start_date:string; start_time:string; end_date:string; end_time:string; minutes:number; description:string; status:"PENDENTE"|"APROVADO"|"REJEITADO"; review_note:string|null; created_at:string; reviewed_at:string|null };
-type View = "dashboard"|"employees"|"occurrences"|"adjustments"|"requests"|"extraRequests"|"holidays"|"report";
+type View = "dashboard"|"employees"|"occurrences"|"adjustments"|"requests"|"holidays"|"report";
 
 const emptyTotals:Totals = {worked_minutes:0,positive_minutes:0,normal_positive_minutes:0,bank_credit_minutes:0,negative_minutes:0,balance_minutes:0,pending:0,extra_minutes:0};
 const fmt=(n:number|null|undefined,s=false)=>{
@@ -96,7 +95,6 @@ export default function Admin(){
 
   const [holidays,setHolidays]=useState<Holiday[]>([]);
   const [adjustmentRequests,setAdjustmentRequests]=useState<AdjustmentRequest[]>([]);
-  const [extraWorkRequests,setExtraWorkRequests]=useState<ExtraWorkRequest[]>([]);
 
   const [adjustEmployee,setAdjustEmployee]=useState("");
   const [adjustDate,setAdjustDate]=useState(todaySP());
@@ -144,18 +142,12 @@ export default function Admin(){
     catch(e){setError(e instanceof Error?e.message:"Erro ao carregar solicitações.");}
   },[api]);
 
-  const loadExtraWorkRequests=useCallback(async()=>{
-    try{const d=await api("/api/admin/extra-work-requests");setExtraWorkRequests(d.requests||[]);}
-    catch(e){setError(e instanceof Error?e.message:"Erro ao carregar jornadas extras.");}
-  },[api]);
-
   useEffect(()=>{void loadBase();},[loadBase]);
   useEffect(()=>{
     if(view==="occurrences")void loadOccurrences();
     if(view==="requests")void loadAdjustmentRequests();
-    if(view==="extraRequests")void loadExtraWorkRequests();
     if(view==="holidays")void loadHolidays();
-  },[view,loadOccurrences,loadAdjustmentRequests,loadExtraWorkRequests,loadHolidays]);
+  },[view,loadOccurrences,loadAdjustmentRequests,loadHolidays]);
 
   async function logout(){
     await api("/api/auth/logout",{method:"POST",body:"{}"});
@@ -245,23 +237,6 @@ export default function Admin(){
     }catch(e){setError(e instanceof Error?e.message:"Erro ao analisar solicitação.");}
   }
 
-  async function reviewExtraWork(req:ExtraWorkRequest,decision:"APROVADO"|"REJEITADO"){
-    const action=decision==="APROVADO"?"aprovar":"rejeitar";
-    if(!window.confirm(`Deseja ${action} a jornada extra de ${fmt(req.minutes)} de ${req.employee_name}?`))return;
-    let reviewNote="";
-    if(decision==="REJEITADO"){
-      const typed=window.prompt("Motivo da rejeição (opcional):","");
-      if(typed===null)return;
-      reviewNote=typed.trim();
-    }
-    try{
-      setError("");setNotice("");
-      await api("/api/admin/extra-work-requests",{method:"PATCH",body:JSON.stringify({id:req.id,decision,review_note:reviewNote})});
-      await Promise.all([loadExtraWorkRequests(),loadBase()]);
-      setNotice(decision==="APROVADO"?"Jornada extra aprovada e adicionada como saldo positivo no banco.":"Solicitação de jornada extra rejeitada.");
-    }catch(e){setError(e instanceof Error?e.message:"Erro ao analisar jornada extra.");}
-  }
-
   async function saveHoliday(e:FormEvent<HTMLFormElement>){
     e.preventDefault();setError("");setNotice("");
     const form=e.currentTarget;
@@ -323,12 +298,12 @@ export default function Admin(){
   function exportCsv(){
     if(!report)return;
     const safe=(v:any)=>{let t=String(v??"");if(/^[=+\-@]/.test(t))t="'"+t;return `"${t.replaceAll('"','""')}"`;};
-    const header=["Funcionário","CPF","Data","Dia","Entrada","Intervalo","Saída","Trabalhado","Débito banco","Saldo do dia","Situação","Observação"];
+    const header=["Funcionário","CPF","Data","Dia","Entrada","Intervalo","Saída","Trabalhado","Banco +","Débito banco","Saldo do dia","Situação","Observação"];
     const lines=[header.map(safe).join(";")];
     for(const r of report.rows)lines.push([
       r.employee_name,formatCpf(r.employee_cpf),formatDate(r.date),r.weekday,r.entrada?String(r.entrada).slice(0,5):"",
       intervalText(r),r.saida?String(r.saida).slice(0,5):"",fmt(r.worked_minutes),
-      fmt(r.bank_debit_minutes),fmt(r.daily_balance_minutes,true),r.status,r.details??""
+      r.bank_credit_display??"",fmt(r.bank_debit_minutes),fmt(r.daily_balance_minutes,true),r.status,r.details??""
     ].map(safe).join(";"));
     const b=new Blob(["\ufeff"+lines.join("\r\n")],{type:"text/csv;charset=utf-8"});
     const u=URL.createObjectURL(b);const a=document.createElement("a");
@@ -354,7 +329,7 @@ export default function Admin(){
       <nav>
         {[
           ["dashboard","Dashboard"],["employees","Funcionários"],["occurrences","Ocorrências"],
-          ["adjustments","Ajuste de ponto"],["requests","Solicitações de ajuste"],["extraRequests","Jornada extra"],["holidays","Feriados"],["report","Relatório mensal"]
+          ["adjustments","Ajuste de ponto"],["requests","Solicitações de ajuste"],["holidays","Feriados"],["report","Relatório mensal"]
         ].map(([k,l])=><button key={k} className={view===k?"active":""} onClick={()=>setView(k as View)}>{l}</button>)}
       </nav>
       <button className="logout" onClick={logout}>Sair</button>
@@ -369,13 +344,12 @@ export default function Admin(){
         <div className="metrics">
           {[
             ["Funcionários",dash?.total??0],["Ativos",dash?.active??0],["Horas trabalhadas",fmt(totals.worked_minutes)],
-            ["Positivo normal",fmt(totals.normal_positive_minutes)],["Crédito jornada extra",fmt(totals.bank_credit_minutes)],
             ["Horas positivas",fmt(totals.positive_minutes)],["Horas negativas",fmt(totals.negative_minutes)],
             ["Saldo",fmt(totals.balance_minutes,true)]
           ].map(([l,v])=><article className="metric" key={String(l)}><span>{l}</span><strong>{v}</strong></article>)}
         </div>
-        <div className="panel tableWrap"><table><thead><tr><th>Funcionário</th><th>Usuário</th><th>Trabalhado</th><th>Positivo normal</th><th>Crédito extra</th><th>Positivas</th><th>Negativas</th><th>Saldo</th><th>Status hoje</th></tr></thead>
-          <tbody>{dash?.employees.map(e=><tr key={e.id}><td>{e.name}</td><td>{e.login}</td><td>{fmt(e.totals.worked_minutes)}</td><td>{fmt(e.totals.normal_positive_minutes)}</td><td>{fmt(e.totals.bank_credit_minutes)}</td><td>{fmt(e.totals.positive_minutes)}</td><td>{fmt(e.totals.negative_minutes)}</td><td>{fmt(e.totals.balance_minutes,true)}</td><td>{e.today_status}</td></tr>)}</tbody>
+        <div className="panel tableWrap"><table><thead><tr><th>Funcionário</th><th>Usuário</th><th>Trabalhado</th><th>Positivas</th><th>Negativas</th><th>Saldo</th><th>Status hoje</th></tr></thead>
+          <tbody>{dash?.employees.map(e=><tr key={e.id}><td>{e.name}</td><td>{e.login}</td><td>{fmt(e.totals.worked_minutes)}</td><td>{fmt(e.totals.positive_minutes)}</td><td>{fmt(e.totals.negative_minutes)}</td><td>{fmt(e.totals.balance_minutes,true)}</td><td>{e.today_status}</td></tr>)}</tbody>
         </table></div>
       </>}
 
@@ -455,16 +429,6 @@ export default function Admin(){
         </table></div>
       </>}
 
-      {view==="extraRequests"&&<>
-        <div className="panel">
-          <div className="sectionHead"><div><p className="eyebrow">APROVAÇÃO</p><h2>Solicitações de jornada extra</h2></div><span className="badge">{extraWorkRequests.filter(r=>r.status==="PENDENTE").length} pendente(s)</span></div>
-          <p className="serverNote">A jornada extra aprovada entra diretamente como saldo positivo no banco de horas. Solicitações pendentes não alteram o saldo.</p>
-        </div>
-        <div className="panel tableWrap"><table><thead><tr><th>Funcionário</th><th>Entrada</th><th>Saída</th><th>Duração</th><th>Referência</th><th>Status</th><th>Ações</th></tr></thead>
-          <tbody>{extraWorkRequests.length?extraWorkRequests.map(r=><tr key={r.id}><td>{r.employee_name}</td><td>{formatDate(r.start_date)} {String(r.start_time).slice(0,5)}</td><td>{formatDate(r.end_date)} {String(r.end_time).slice(0,5)}</td><td>{fmt(r.minutes)}</td><td>{r.description}</td><td>{r.status}{r.review_note?` — ${r.review_note}`:""}</td><td>{r.status==="PENDENTE"?<div className="reportActions"><button className="primary" onClick={()=>reviewExtraWork(r,"APROVADO")}>Aprovar</button><button className="secondary" onClick={()=>reviewExtraWork(r,"REJEITADO")}>Rejeitar</button></div>:"—"}</td></tr>):<tr><td colSpan={7}>Nenhuma solicitação de jornada extra.</td></tr>}</tbody>
-        </table></div>
-      </>}
-
       {view==="holidays"&&<>
         <div className="panel">
           <div className="sectionHead"><div><p className="eyebrow">CALENDÁRIO</p><h2>Cadastrar feriado</h2></div></div>
@@ -510,8 +474,6 @@ export default function Admin(){
             <div className="printTotals">
               {[
                 ["Trabalhadas",fmt(employeeReport.totals.worked_minutes)],
-                ["Positivo normal",fmt(employeeReport.totals.normal_positive_minutes)],
-                ["Crédito jornada extra",fmt(employeeReport.totals.bank_credit_minutes)],
                 ["Positivas",fmt(employeeReport.totals.positive_minutes)],
                 ["Negativas",fmt(employeeReport.totals.negative_minutes)],
                 ["Saldo do mês",fmt(employeeReport.totals.balance_minutes,true)]
@@ -520,7 +482,7 @@ export default function Admin(){
 
             <div className="tableWrap printTableWrap">
               <table className="monthlyPunchTable">
-                <thead><tr><th>Data</th><th>Dia</th><th>Entrada</th><th>Intervalo</th><th>Saída</th><th>Trabalhado</th><th>Débito</th><th>Saldo dia</th><th>Situação / observação</th></tr></thead>
+                <thead><tr><th>Data</th><th>Dia</th><th>Entrada</th><th>Intervalo</th><th>Saída</th><th>Trabalhado</th><th>Banco +</th><th>Débito</th><th>Saldo dia</th><th>Situação / observação</th></tr></thead>
                 <tbody>{employeeReport.rows.map((r:any)=><tr key={r.date} className={reportRowClass(r)}>
                   <td>{formatDate(r.date)}</td>
                   <td>{r.weekday}</td>
@@ -528,6 +490,7 @@ export default function Admin(){
                   <td>{intervalText(r)}</td>
                   <td>{r.saida?String(r.saida).slice(0,5):"—"}</td>
                   <td>{fmt(r.worked_minutes)}</td>
+                  <td className="creditCell">{r.bank_credit_minutes?<><strong>+{fmt(r.bank_credit_minutes)}</strong><span>{r.bank_credit_display}</span></>:"—"}</td>
                   <td>{r.bank_debit_minutes?fmt(r.bank_debit_minutes):"—"}</td>
                   <td>{fmt(r.daily_balance_minutes,true)}</td>
                   <td className="statusCell"><strong>{r.status}</strong>{r.details&&<span>{r.details}</span>}</td>
