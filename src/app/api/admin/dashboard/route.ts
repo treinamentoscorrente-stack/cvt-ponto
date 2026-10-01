@@ -8,33 +8,56 @@ import { jsonError } from "@/lib/http";
 
 export const runtime = "nodejs";
 
-export async function GET(){
+const MONTH_RE=/^\d{4}-(0[1-9]|1[0-2])$/;
+
+export async function GET(request:Request){
   const auth=await requireSession("admin");
   if(!auth.ok)return jsonError(auth.error,auth.status);
 
   const employees=(await db.query("SELECT id,name,status,login FROM employees ORDER BY name")).rows;
   const today=saoPauloNow().date;
   const currentMonth=today.slice(0,7);
-  const all:any[]=[];
-  const out:any[]=[];
-  let allExtra=0;
+  const requestedMonth=new URL(request.url).searchParams.get("month")||currentMonth;
+  if(!MONTH_RE.test(requestedMonth))return jsonError("Competência inválida.",400);
+
+  const allGeneral:any[]=[];
+  const allMonthly:any[]=[];
+  const generalEmployees:any[]=[];
+  const monthlyEmployees:any[]=[];
+  let allGeneralExtra=0;
+  let allMonthlyExtra=0;
 
   for(const employee of employees){
     const id=Number(employee.id);
-    const [summaries,extraMinutes]=await Promise.all([
-      summariesForEmployee(id,currentMonth),
-      extraMinutesForEmployee(id,currentMonth),
+    const [generalSummaries,generalExtra,monthlySummaries,monthlyExtra]=await Promise.all([
+      summariesForEmployee(id),
+      extraMinutesForEmployee(id),
+      summariesForEmployee(id,requestedMonth),
+      extraMinutesForEmployee(id,requestedMonth),
     ]);
-    all.push(...summaries);
-    allExtra+=extraMinutes;
-    const td=summaries.find(v=>v.date===today);
-    out.push({
+
+    allGeneral.push(...generalSummaries);
+    allMonthly.push(...monthlySummaries);
+    allGeneralExtra+=generalExtra;
+    allMonthlyExtra+=monthlyExtra;
+
+    const todaySummary=generalSummaries.find(v=>v.date===today);
+    const base={
       id,
       name:employee.name,
       status:employee.status,
       login:employee.login,
-      totals:totalsWithExtra(aggregate(summaries),extraMinutes),
-      today_status:td?.status??"SEM REGISTRO",
+    };
+
+    generalEmployees.push({
+      ...base,
+      totals:totalsWithExtra(aggregate(generalSummaries),generalExtra),
+      today_status:todaySummary?.status??"SEM REGISTRO",
+    });
+
+    monthlyEmployees.push({
+      ...base,
+      totals:totalsWithExtra(aggregate(monthlySummaries),monthlyExtra),
     });
   }
 
@@ -42,7 +65,10 @@ export async function GET(){
     total:employees.length,
     active:employees.filter(x=>x.status==="ATIVO").length,
     inactive:employees.filter(x=>x.status==="INATIVO").length,
-    totals:totalsWithExtra(aggregate(all),allExtra),
-    employees:out,
+    totals:totalsWithExtra(aggregate(allGeneral),allGeneralExtra),
+    employees:generalEmployees,
+    month:requestedMonth,
+    monthly_totals:totalsWithExtra(aggregate(allMonthly),allMonthlyExtra),
+    monthly_employees:monthlyEmployees,
   },{headers:{"cache-control":"no-store"}});
 }
