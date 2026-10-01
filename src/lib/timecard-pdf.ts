@@ -2,7 +2,6 @@
 
 import { jsPDF } from "jspdf";
 import { autoTable } from "jspdf-autotable";
-import { CVT_LOGO_DATA_URI } from "@/lib/cvt-logo";
 
 type EmployeeReport={
   employee_id:number;
@@ -88,17 +87,22 @@ export function downloadTimecardPdf(report:MonthlyReport){
   const pageWidth=doc.internal.pageSize.getWidth();
   const pageHeight=doc.internal.pageSize.getHeight();
 
-  // Cabeçalho institucional com a marca oficial da CVT.
-  doc.addImage(CVT_LOGO_DATA_URI,"PNG",12,9.5,19,19);
+  // Identidade institucional simples, sem imagem de logo.
+  doc.setFillColor(240,122,26);
+  doc.roundedRect(12,11,15,15,2,2,"F");
+  doc.setTextColor(255,255,255);
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(8.5);
+  doc.text("CVT",19.5,20.5,{align:"center"});
 
   doc.setTextColor(25,32,38);
   doc.setFont("helvetica","bold");
   doc.setFontSize(11);
-  doc.text("Corrente da Vida Treinamentos",35,15.5);
+  doc.text("Corrente da Vida Treinamentos",32,15.5);
   doc.setFont("helvetica","normal");
   doc.setFontSize(7.2);
   doc.setTextColor(104,113,121);
-  doc.text("Cartao Ponto Mensal",35,21);
+  doc.text("Cartao Ponto Mensal",32,21);
 
   doc.setFont("helvetica","bold");
   doc.setFontSize(9);
