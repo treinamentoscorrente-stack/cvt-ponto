@@ -2,6 +2,7 @@
 
 import { jsPDF } from "jspdf";
 import { autoTable } from "jspdf-autotable";
+import { CVT_LOGO_DATA_URI } from "@/lib/cvt-logo";
 
 type EmployeeReport={
   employee_id:number;
@@ -87,22 +88,17 @@ export function downloadTimecardPdf(report:MonthlyReport){
   const pageWidth=doc.internal.pageSize.getWidth();
   const pageHeight=doc.internal.pageSize.getHeight();
 
-  // Cabeçalho institucional compacto.
-  doc.setFillColor(240,122,26);
-  doc.roundedRect(12,11,15,15,2,2,"F");
-  doc.setTextColor(255,255,255);
-  doc.setFont("helvetica","bold");
-  doc.setFontSize(8.5);
-  doc.text("CVT",19.5,20.5,{align:"center"});
+  // Cabeçalho institucional com a marca oficial da CVT.
+  doc.addImage(CVT_LOGO_DATA_URI,"PNG",12,9.5,19,19);
 
   doc.setTextColor(25,32,38);
   doc.setFont("helvetica","bold");
   doc.setFontSize(11);
-  doc.text("Corrente da Vida Treinamentos",32,15.5);
+  doc.text("Corrente da Vida Treinamentos",35,15.5);
   doc.setFont("helvetica","normal");
   doc.setFontSize(7.2);
   doc.setTextColor(104,113,121);
-  doc.text("Cartao Ponto Mensal",32,21);
+  doc.text("Cartao Ponto Mensal",35,21);
 
   doc.setFont("helvetica","bold");
   doc.setFontSize(9);
@@ -248,18 +244,25 @@ export function downloadTimecardPdf(report:MonthlyReport){
   doc.setFontSize(6.4);
   doc.text("Declaro que conferi os registros deste cartao ponto mensal.",pageWidth/2,signatureY-9,{align:"center"});
 
+  const employeeX=58;
+  const rhX=152;
+
   doc.setDrawColor(55,63,70);
   doc.setLineWidth(.3);
-  doc.line(pageWidth/2-48,signatureY,pageWidth/2+48,signatureY);
+  doc.line(employeeX-34,signatureY,employeeX+34,signatureY);
+  doc.line(rhX-34,signatureY,rhX+34,signatureY);
 
   doc.setTextColor(25,32,38);
   doc.setFont("helvetica","bold");
   doc.setFontSize(7);
-  doc.text(clean(employee.employee_name),pageWidth/2,signatureY+4,{align:"center"});
+  doc.text(clean(employee.employee_name),employeeX,signatureY+4,{align:"center"});
+  doc.text("Andre Celestino",rhX,signatureY+4,{align:"center"});
+
   doc.setTextColor(104,113,121);
   doc.setFont("helvetica","normal");
   doc.setFontSize(6.2);
-  doc.text("Assinatura do funcionario",pageWidth/2,signatureY+8,{align:"center"});
+  doc.text("Assinatura do funcionario",employeeX,signatureY+8,{align:"center"});
+  doc.text("Coordenador RH",rhX,signatureY+8,{align:"center"});
 
   doc.setDrawColor(226,229,232);
   doc.line(12,pageHeight-10,pageWidth-12,pageHeight-10);
