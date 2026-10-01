@@ -8,6 +8,12 @@ type EmployeeReport={
   employee_name:string;
   employee_cpf:string;
   admission_date:string;
+  totals:{
+    worked_minutes:number;
+    positive_minutes:number;
+    negative_minutes:number;
+    balance_minutes:number;
+  };
   rows:Array<any>;
 };
 
@@ -20,6 +26,12 @@ const fmt=(n:number|null|undefined)=>{
   if(n==null)return "-";
   const a=Math.abs(n);
   return `${String(Math.floor(a/60)).padStart(2,"0")}h${String(a%60).padStart(2,"0")}`;
+};
+
+const fmtSigned=(n:number|null|undefined)=>{
+  if(n==null)return "-";
+  const sign=n>0?"+":n<0?"-":"";
+  return `${sign}${fmt(n)}`;
 };
 
 const formatDate=(value:string|null|undefined)=>{
@@ -125,11 +137,12 @@ export function downloadTimecardPdf(report:MonthlyReport){
     intervalText(r),
     r.saida?String(r.saida).slice(0,5):"-",
     fmt(Number(r.worked_minutes)),
+    fmtSigned(Number(r.daily_balance_minutes||0)),
   ]);
 
   autoTable(doc,{
     startY:47,
-    head:[["Data","Dia","Entrada","Intervalo","Saida","Horas"]],
+    head:[["Data","Dia","Entrada","Intervalo","Saida","Horas","Banco"]],
     body,
     theme:"grid",
     pageBreak:"avoid",
@@ -155,16 +168,24 @@ export function downloadTimecardPdf(report:MonthlyReport){
       lineColor:[205,211,216],
     },
     columnStyles:{
-      0:{cellWidth:28},
-      1:{cellWidth:24},
-      2:{cellWidth:29},
-      3:{cellWidth:47},
-      4:{cellWidth:29},
-      5:{cellWidth:29,fontStyle:"bold"},
+      0:{cellWidth:24},
+      1:{cellWidth:20},
+      2:{cellWidth:24},
+      3:{cellWidth:38},
+      4:{cellWidth:24},
+      5:{cellWidth:26,fontStyle:"bold"},
+      6:{cellWidth:30,fontStyle:"bold"},
     },
     didParseCell:(data:any)=>{
       if(data.section==="body"&&data.row.index%2===1){
         data.cell.styles.fillColor=[250,251,252];
+      }
+      if(data.section==="body"&&data.column.index===6){
+        const row=workedRows[data.row.index];
+        const bank=Number(row?.daily_balance_minutes||0);
+        if(bank>0)data.cell.styles.textColor=[47,112,71];
+        if(bank<0)data.cell.styles.textColor=[153,55,55];
+        if(bank===0)data.cell.styles.textColor=[70,82,92];
       }
     },
   });
@@ -176,17 +197,35 @@ export function downloadTimecardPdf(report:MonthlyReport){
   const finalY=(doc as any).lastAutoTable?.finalY??185;
   const summaryY=Math.min(Math.max(finalY+6,205),235);
 
+  const half=(pageWidth-27)/2;
+
   doc.setFillColor(248,249,250);
   doc.setDrawColor(220,224,228);
-  doc.roundedRect(12,summaryY,pageWidth-24,13,2,2,"FD");
+  doc.roundedRect(12,summaryY,half,13,2,2,"FD");
   doc.setTextColor(104,113,121);
   doc.setFont("helvetica","normal");
-  doc.setFontSize(6.8);
-  doc.text("TOTAL DE HORAS TRABALHADAS NO MES",17,summaryY+5);
+  doc.setFontSize(6.5);
+  doc.text("TOTAL TRABALHADO NO MES",16,summaryY+5);
   doc.setTextColor(25,32,38);
   doc.setFont("helvetica","bold");
-  doc.setFontSize(10);
-  doc.text(fmt(totalWorked),pageWidth-17,summaryY+8,{align:"right"});
+  doc.setFontSize(9.5);
+  doc.text(fmt(totalWorked),12+half-5,summaryY+8,{align:"right"});
+
+  const bankX=15+half;
+  const monthBalance=Number(employee.totals.balance_minutes||0);
+  doc.setFillColor(monthBalance>0?242:monthBalance<0?253:248,monthBalance>0?249:monthBalance<0?244:249,monthBalance>0?244:monthBalance<0?244:250);
+  doc.setDrawColor(220,224,228);
+  doc.roundedRect(bankX,summaryY,half,13,2,2,"FD");
+  doc.setTextColor(104,113,121);
+  doc.setFont("helvetica","normal");
+  doc.setFontSize(6.5);
+  doc.text("SALDO DO BANCO NO MES",bankX+4,summaryY+5);
+  if(monthBalance>0)doc.setTextColor(47,112,71);
+  else if(monthBalance<0)doc.setTextColor(153,55,55);
+  else doc.setTextColor(25,32,38);
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(9.5);
+  doc.text(fmtSigned(monthBalance),bankX+half-5,summaryY+8,{align:"right"});
 
   // Assinatura fixa no rodapé para manter uma única folha.
   const signatureY=265;
