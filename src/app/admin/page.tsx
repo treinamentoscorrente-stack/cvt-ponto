@@ -277,7 +277,6 @@ export default function Admin(){
   }
 
   const totals=dash?.totals??emptyTotals;
-  const monthlyTotals=dash?.monthly_totals??emptyTotals;
 
   return <div className="appShell adminShell">
     <aside className="sidebar adminSidebar">
@@ -305,20 +304,12 @@ export default function Admin(){
 
         <div className="panel adminDashboardMonth">
           <div className="sectionHead dashboardMonthHead">
-            <div><p className="eyebrow">VISÃO POR COMPETÊNCIA</p><h2>Banco de horas por mês</h2><p className="dashboardHelper">Selecione o mês para comparar rapidamente positivas, negativas e saldo de cada funcionário.</p></div>
-            <label className="dashboardMonthFilter">Competência<input type="month" value={dashboardMonth} max={todaySP().slice(0,7)} onChange={e=>setDashboardMonth(e.target.value)} /></label>
+            <div><p className="eyebrow">VISÃO POR MÊS</p><h2>Banco de horas mensal</h2><p className="dashboardHelper">Selecione o mês para consultar rapidamente o saldo de cada funcionário.</p></div>
+            <label className="dashboardMonthFilter">Mês<input type="month" value={dashboardMonth} max={todaySP().slice(0,7)} onChange={e=>setDashboardMonth(e.target.value)} /></label>
           </div>
 
-          <div className="dashboardMonthTotals">
-            <div><span>Competência</span><strong>{formatMonth(dash?.month??dashboardMonth)}</strong></div>
-            <div><span>Trabalhadas</span><strong>{fmt(monthlyTotals.worked_minutes)}</strong></div>
-            <div><span>Positivas</span><strong className="bankPositive">{fmt(monthlyTotals.positive_minutes)}</strong></div>
-            <div><span>Negativas</span><strong className="bankNegative">{fmt(monthlyTotals.negative_minutes)}</strong></div>
-            <div><span>Saldo do mês</span><strong className={monthlyTotals.balance_minutes>=0?"bankBalance positive":"bankBalance negative"}>{fmt(monthlyTotals.balance_minutes,true)}</strong></div>
-          </div>
-
-          <div className="tableWrap dashboardMonthTable"><table><thead><tr><th>Funcionário</th><th>Trabalhado</th><th>Positivas</th><th>Negativas</th><th>Saldo do mês</th></tr></thead>
-            <tbody>{dash?.monthly_employees?.map(e=><tr key={e.id}><td><strong>{e.name}</strong></td><td>{fmt(e.totals.worked_minutes)}</td><td className="bankPositive">{fmt(e.totals.positive_minutes)}</td><td className="bankNegative">{fmt(e.totals.negative_minutes)}</td><td className={e.totals.balance_minutes>=0?"bankBalance positive":"bankBalance negative"}>{fmt(e.totals.balance_minutes,true)}</td></tr>)}</tbody>
+          <div className="tableWrap dashboardMonthTable"><table><thead><tr><th>Funcionário</th><th>Horas</th></tr></thead>
+            <tbody>{dash?.monthly_employees?.map(e=><tr key={e.id}><td><strong>{e.name}</strong></td><td className={e.totals.balance_minutes>=0?"bankBalance positive":"bankBalance negative"}>{fmt(e.totals.balance_minutes,true)}</td></tr>)}</tbody>
           </table></div>
         </div>
       </>}
