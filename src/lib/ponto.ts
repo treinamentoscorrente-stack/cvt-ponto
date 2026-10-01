@@ -31,12 +31,17 @@ export type DaySummary = {
   holiday_description: string | null;
 };
 
+async function regularWeekdayExpected(date: string) {
+  if (weekend(date)) return 0;
+  const company = await db.query(`SELECT daily_minutes FROM company WHERE id=1`);
+  return Number(company.rows[0]?.daily_minutes ?? 480);
+}
+
 export async function baseExpected(date: string) {
   if (weekend(date)) return 0;
   const holiday = await db.query(`SELECT 1 FROM holidays WHERE holiday_date=$1`, [date]);
   if (holiday.rowCount) return 0;
-  const company = await db.query(`SELECT daily_minutes FROM company WHERE id=1`);
-  return Number(company.rows[0]?.daily_minutes ?? 480);
+  return regularWeekdayExpected(date);
 }
 
 export async function getOccurrence(employeeId: number, date: string): Promise<DayOccurrence | null> {
@@ -124,8 +129,15 @@ export async function summarizeRows(
   const nowDate = saoPauloNow().date;
   const future = date > nowDate;
   const occurrenceLabel = labelOccurrence(occurrence);
-  const expected = await dailyExpected(date, occurrence);
+  let expected = await dailyExpected(date, occurrence);
   const bankDebit = await bankDebitMinutes(date, occurrence);
+
+  // Feriado sem trabalho continua neutro. Se houver jornada registrada em um
+  // feriado de dia útil, comparamos o trabalho com a jornada normal do dia
+  // para não transformar automaticamente toda a carga horária em saldo positivo.
+  if (holidayDescription && rows.length > 0 && !occurrence) {
+    expected = await regularWeekdayExpected(date);
+  }
 
   let worked: number | null = null;
   let balance: number | null = null;
@@ -163,7 +175,11 @@ export async function summarizeRows(
     if (worked !== null) {
       balance = worked - expected - bankDebit;
       const result = outcome(balance);
-      status = occurrenceLabel ? `${occurrenceLabel} — ${result}` : result;
+      status = occurrenceLabel
+        ? `${occurrenceLabel} — ${result}`
+        : holidayDescription
+          ? `FERIADO — ${result}`
+          : result;
     } else if (rows.length > 0) {
       const partial = date === nowDate ? "EM ANDAMENTO" : "JORNADA INCOMPLETA";
       if (occurrence?.occurrence_type === "FOLGA") balance = -bankDebit;
