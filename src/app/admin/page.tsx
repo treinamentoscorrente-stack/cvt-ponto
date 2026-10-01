@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Emp = { id:number; name:string; cpf:string; admission_date:string; status:"ATIVO"|"INATIVO"; login:string };
-type Totals = { worked_minutes:number; positive_minutes:number; normal_positive_minutes:number; bank_credit_minutes:number; negative_minutes:number; balance_minutes:number; pending:number; extra_minutes:number };
+type Totals = { worked_minutes:number; positive_minutes:number; negative_minutes:number; balance_minutes:number; pending:number };
 type Dash = { total:number; active:number; inactive:number; totals:Totals; employees:Array<{id:number;name:string;login:string;status:string;totals:Totals;today_status:string}> };
 type EmployeeReport = { employee_id:number; employee_name:string; employee_cpf:string; admission_date:string; totals:Totals; rows:Array<any> };
 type Report = { month:string; employee_label:string; totals:Totals; rows:Array<any>; employee_reports:Array<EmployeeReport> };
@@ -13,7 +13,7 @@ type Holiday = { id:number; holiday_date:string; description:string };
 type AdjustmentRequest = { id:number; employee_id:number; employee_name:string; work_date:string; requested_entrada:string|null; requested_intervalo_inicio:string|null; requested_intervalo_fim:string|null; requested_saida:string|null; reason:string; original_punches:Array<{punch_type:string;punch_time:string}>; status:"PENDENTE"|"APROVADO"|"REJEITADO"; review_note:string|null; created_at:string; reviewed_at:string|null };
 type View = "dashboard"|"employees"|"occurrences"|"adjustments"|"requests"|"holidays"|"report";
 
-const emptyTotals:Totals = {worked_minutes:0,positive_minutes:0,normal_positive_minutes:0,bank_credit_minutes:0,negative_minutes:0,balance_minutes:0,pending:0,extra_minutes:0};
+const emptyTotals:Totals = {worked_minutes:0,positive_minutes:0,negative_minutes:0,balance_minutes:0,pending:0};
 const fmt=(n:number|null|undefined,s=false)=>{
   if(n==null)return "—";
   const sign=n<0?"-":s&&n>0?"+":"";
