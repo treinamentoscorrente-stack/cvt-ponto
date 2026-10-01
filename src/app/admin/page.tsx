@@ -2,8 +2,6 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
-import { CVT_LOGO_DATA_URI } from "@/lib/cvt-logo";
 
 type Emp = { id:number; name:string; cpf:string; admission_date:string; status:"ATIVO"|"INATIVO"; login:string };
 type Totals = { worked_minutes:number; positive_minutes:number; negative_minutes:number; balance_minutes:number; pending:number };
@@ -340,7 +338,7 @@ export default function Admin(){
 
   return <div className="appShell">
     <aside className="sidebar">
-      <div className="sideBrand"><Image src={CVT_LOGO_DATA_URI} alt="Logo CVT" width={45} height={45} unoptimized className="brandLogo small" /><div><strong>Controle de Ponto</strong><small>Área administrativa</small></div></div>
+      <div className="sideBrand"><div className="brandMark small">CVT</div><div><strong>Controle de Ponto</strong><small>Área administrativa</small></div></div>
       <nav>
         {[
           ["dashboard","Dashboard"],["employees","Funcionários"],["occurrences","Ocorrências"],
@@ -475,7 +473,7 @@ export default function Admin(){
           {report?.employee_reports?.map((employeeReport,index)=><section className="employeePrintSheet" key={employeeReport.employee_id}>
             <header className="printReportHeader">
               <div className="printBrand">
-                <Image src={CVT_LOGO_DATA_URI} alt="Logo CVT" width={44} height={44} unoptimized className="brandLogo printLogoImg" />
+                <div className="brandMark printLogo">CVT</div>
                 <div><strong>Corrente da Vida Treinamentos</strong><span>Espelho Mensal de Ponto</span></div>
               </div>
               <div className="printPeriod"><span>Competência</span><strong>{formatMonth(report.month)}</strong></div>
