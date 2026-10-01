@@ -22,15 +22,10 @@ function hm(minutes:number){
 }
 
 function reportTotals(base:ReturnType<typeof aggregate>,bankCredit:number){
-  const normalPositive=base.positive_minutes;
-  const totalPositive=normalPositive+bankCredit;
   return {
     ...base,
-    normal_positive_minutes:normalPositive,
-    bank_credit_minutes:bankCredit,
-    positive_minutes:totalPositive,
-    balance_minutes:totalPositive-base.negative_minutes,
-    extra_minutes:bankCredit,
+    positive_minutes:base.positive_minutes+bankCredit,
+    balance_minutes:base.balance_minutes+bankCredit,
   };
 }
 
