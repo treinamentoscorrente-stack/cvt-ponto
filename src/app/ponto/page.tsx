@@ -8,6 +8,15 @@ const formatDate=(value:string|null|undefined)=>{if(!value)return"—";const raw
 const todaySP=()=>new Intl.DateTimeFormat("sv-SE",{timeZone:"America/Sao_Paulo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
 const statusLabel=(s:string)=>s==="PENDENTE"?"Pendente":s==="APROVADO"?"Aprovado":"Rejeitado";
 const extraEnd=(x:any)=>x.end_date&&x.end_date!==x.start_date?`${String(x.end_time).slice(0,5)} (${formatDate(x.end_date)})`:String(x.end_time).slice(0,5);
+const manualMinutes=(startDate:string,startTime:string,endDate:string,endTime:string)=>{
+  const parse=(date:string,time:string)=>{
+    const [y,m,d]=date.split("-").map(Number);
+    const [h,mi]=time.split(":").map(Number);
+    return Date.UTC(y,m-1,d,h,mi);
+  };
+  if(!startDate||!startTime||!endDate||!endTime)return NaN;
+  return Math.round((parse(endDate,endTime)-parse(startDate,startTime))/60000);
+};
 
 export default function Ponto(){
   const router=useRouter();
@@ -79,17 +88,28 @@ export default function Ponto(){
   async function requestExtra(e:FormEvent<HTMLFormElement>){
     e.preventDefault();
     if(extraBusy)return;
-    setExtraBusy(true);setError("");setNotice("");
+    setError("");setNotice("");
+
+    const minutes=manualMinutes(extraStartDate,extraStartTime,extraEndDate,extraEndTime);
+    if(!Number.isFinite(minutes)||minutes<=0){setError("A saída deve ser posterior à entrada.");return;}
+    if(minutes>1440){setError("O crédito de banco não pode ultrapassar 24 horas.");return;}
+
+    const confirmed=window.confirm(
+      `CONFIRMAR CRÉDITO NO BANCO DE HORAS\n\nEntrada: ${formatDate(extraStartDate)} ${extraStartTime}\nSaída: ${formatDate(extraEndDate)} ${extraEndTime}\nCrédito: +${fmt(minutes)}\nReferência: ${extraDescription.trim()}\n\nApós confirmar, este período será lançado imediatamente nas horas positivas do banco. Confirma os dados?`
+    );
+    if(!confirmed)return;
+
+    setExtraBusy(true);
     try{
       const result=await api("/api/employee/extra-work",{method:"POST",body:JSON.stringify({
         start_date:extraStartDate,start_time:extraStartTime,
         end_date:extraEndDate,end_time:extraEndTime,
         description:extraDescription,
       })});
-      setNotice(`Jornada extra enviada para aprovação: ${fmt(result.minutes)}. Após aprovação, entra como saldo positivo no banco.`);
+      setNotice(`Crédito lançado no banco de horas: +${fmt(result.minutes)}.`);
       setExtraStartTime("");setExtraEndTime("");setExtraDescription("");
-      await loadExtraRequests();
-    }catch(e){setError(e instanceof Error?e.message:"Erro ao enviar jornada extra.");}
+      await Promise.all([loadExtraRequests(),load()]);
+    }catch(e){setError(e instanceof Error?e.message:"Erro ao registrar crédito no banco de horas.");}
     finally{setExtraBusy(false);}
   }
 
@@ -150,8 +170,6 @@ export default function Ponto(){
     <section className="employeeMetrics">
       {[
         ["Horas trabalhadas",fmt(data?.totals.worked_minutes)],
-        ["Positivo normal",fmt(data?.totals.normal_positive_minutes)],
-        ["Crédito jornada extra",fmt(data?.totals.bank_credit_minutes)],
         ["Horas positivas",fmt(data?.totals.positive_minutes)],
         ["Horas negativas",fmt(data?.totals.negative_minutes)],
         ["Saldo",fmt(data?.totals.balance_minutes,true)]
@@ -166,8 +184,8 @@ export default function Ponto(){
 
     <section className="panel">
       <div className="sectionHead">
-        <div><p className="eyebrow">JORNADA EXTRA</p><h2>Solicitar crédito no banco de horas</h2></div>
-        <span className="badge">Sujeito à aprovação</span>
+        <div><p className="eyebrow">BANCO DE HORAS</p><h2>Lançar crédito manual</h2></div>
+        <span className="badge">Confirmação obrigatória</span>
       </div>
       <form className="formGrid" onSubmit={requestExtra}>
         <label>Data da entrada<input type="date" value={extraStartDate} max={todaySP()} onChange={e=>setExtraStartDate(e.target.value)} required /></label>
@@ -175,22 +193,15 @@ export default function Ponto(){
         <label>Data da saída<input type="date" value={extraEndDate} max={todaySP()} onChange={e=>setExtraEndDate(e.target.value)} required /></label>
         <label>Hora da saída<input type="time" value={extraEndTime} onChange={e=>setExtraEndTime(e.target.value)} required /></label>
         <label>Referência / motivo<input value={extraDescription} onChange={e=>setExtraDescription(e.target.value)} minLength={3} maxLength={160} placeholder="Ex.: Treinamento Karsten" required /></label>
-        <div className="formAction"><button className="primary" disabled={extraBusy}>{extraBusy?"ENVIANDO...":"ENVIAR JORNADA EXTRA PARA APROVAÇÃO"}</button></div>
+        <div className="formAction"><button className="primary" disabled={extraBusy}>{extraBusy?"LANÇANDO...":"VALIDAR E LANÇAR NO BANCO"}</button></div>
       </form>
-      <p className="serverNote">Exemplo: entrada 22:15 em 29/09 e saída 03:00 em 30/09. O período aprovado entra integralmente como saldo positivo no banco de horas.</p>
+      <p className="serverNote">Antes de gravar, o sistema mostra uma confirmação com entrada, saída e duração. Após confirmar, o período entra imediatamente nas horas positivas do banco.</p>
     </section>
 
     <section className="panel tableWrap">
-      <h2>Minhas solicitações de jornada extra</h2>
-      <table><thead><tr><th>Entrada</th><th>Saída</th><th>Duração</th><th>Referência</th><th>Status</th><th>Retorno</th></tr></thead>
-        <tbody>{extraRequests.length?extraRequests.map((x:any)=><tr key={x.id}><td>{formatDate(x.start_date)} {String(x.start_time).slice(0,5)}</td><td>{formatDate(x.end_date)} {String(x.end_time).slice(0,5)}</td><td>{fmt(Number(x.minutes))}</td><td>{x.description}</td><td>{statusLabel(x.status)}</td><td>{x.review_note??"—"}</td></tr>):<tr><td colSpan={6}>Nenhuma solicitação enviada.</td></tr>}</tbody>
-      </table>
-    </section>
-
-    <section className="panel tableWrap">
-      <h2>Jornadas extras aprovadas</h2>
-      <table><thead><tr><th>Data</th><th>Entrada</th><th>Saída</th><th>Duração</th><th>Referência</th></tr></thead>
-        <tbody>{data?.recent_extra?.length?data.recent_extra.map((x:any)=><tr key={x.id}><td>{formatDate(x.start_date)}</td><td>{String(x.start_time).slice(0,5)}</td><td>{extraEnd(x)}</td><td>{fmt(x.minutes)}</td><td>{x.description??"—"}</td></tr>):<tr><td colSpan={5}>Nenhuma jornada extra aprovada.</td></tr>}</tbody>
+      <h2>Créditos lançados no banco</h2>
+      <table><thead><tr><th>Entrada</th><th>Saída</th><th>Crédito</th><th>Referência</th></tr></thead>
+        <tbody>{extraRequests.length?extraRequests.map((x:any)=><tr key={x.id}><td>{formatDate(x.start_date)} {String(x.start_time).slice(0,5)}</td><td>{formatDate(x.end_date)} {String(x.end_time).slice(0,5)}</td><td>+{fmt(Number(x.minutes))}</td><td>{x.description}</td></tr>):<tr><td colSpan={4}>Nenhum crédito manual lançado.</td></tr>}</tbody>
       </table>
     </section>
 

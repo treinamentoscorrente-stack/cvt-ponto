@@ -22,15 +22,10 @@ function hm(minutes:number){
 }
 
 function reportTotals(base:ReturnType<typeof aggregate>,bankCredit:number){
-  const normalPositive=base.positive_minutes;
-  const totalPositive=normalPositive+bankCredit;
   return {
     ...base,
-    normal_positive_minutes:normalPositive,
-    bank_credit_minutes:bankCredit,
-    positive_minutes:totalPositive,
-    balance_minutes:totalPositive-base.negative_minutes,
-    extra_minutes:bankCredit,
+    positive_minutes:base.positive_minutes+bankCredit,
+    balance_minutes:base.balance_minutes+bankCredit,
   };
 }
 
@@ -49,7 +44,6 @@ export async function GET(request:Request){
 
   const employeeReports:any[]=[];
   const allRows:any[]=[];
-  const allExtraRows:any[]=[];
   const aggregateDays:any[]=[];
   let aggregateExtra=0;
 
@@ -67,7 +61,6 @@ export async function GET(request:Request){
       current.minutes+=x.minutes;
       if(x.description&&!current.descriptions.includes(x.description))current.descriptions.push(x.description);
       extraByDate.set(x.start_date,current);
-      allExtraRows.push({employee_id:id,employee_name:employee.name,employee_cpf:employee.cpf,...x});
     }
 
     const rows=summaries
@@ -80,7 +73,7 @@ export async function GET(request:Request){
         const details:string[]=[];
         if(day.holiday_description)details.push(day.holiday_description);
         if(day.note)details.push(day.note);
-        if(extra.minutes>0)details.push(`Jornada extra aprovada ${hm(extra.minutes)} no banco: ${extra.descriptions.join(", ")||"sem referência"}`);
+        if(extra.minutes>0)details.push(`Crédito de banco ${hm(extra.minutes)}: ${extra.descriptions.join(", ")||"sem referência"}`);
 
         return {
           employee_id:id,
@@ -88,7 +81,13 @@ export async function GET(request:Request){
           employee_cpf:employee.cpf,
           ...day,
           weekday:weekday(day.date),
-          extra_minutes:extra.minutes,
+          bank_credit_minutes:extra.minutes,
+          bank_credit_display:extra.minutes>0
+            ? extraSessions
+                .filter(x=>x.start_date===day.date)
+                .map(x=>`${String(x.start_time).slice(0,5)}→${String(x.end_time).slice(0,5)}  +${String(Math.floor(x.minutes/60)).padStart(2,"0")}h${String(x.minutes%60).padStart(2,"0")}`)
+                .join(" / ")
+            : "",
           daily_balance_minutes:dailyBalance,
           details:details.join(" • "),
         };
@@ -111,14 +110,11 @@ export async function GET(request:Request){
   }
 
   allRows.sort((a,b)=>a.employee_name.localeCompare(b.employee_name)||a.date.localeCompare(b.date));
-  allExtraRows.sort((a,b)=>a.employee_name.localeCompare(b.employee_name)||a.start_date.localeCompare(b.start_date)||a.start_time.localeCompare(b.start_time));
-
   return NextResponse.json({
     month,
     employee_label:raw==="ALL"?"Todos os funcionários":employees[0]?.name??"Funcionário",
     totals:reportTotals(aggregate(aggregateDays),aggregateExtra),
     rows:allRows,
-    extra_rows:allExtraRows,
     employee_reports:employeeReports,
   },{headers:{"cache-control":"no-store"}});
 }

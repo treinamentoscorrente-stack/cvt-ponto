@@ -58,20 +58,21 @@ A folga consome saldo do banco de horas no momento em que é cadastrada. Se não
 - Em uma jornada prevista de 8h, esse exemplo gera +5h40 de saldo positivo.
 - Se existir apenas Entrada, ou uma sequência parcial de intervalo, a jornada continua incompleta até haver registros suficientes.
 
-## Jornada extra
-- O registro é manual e sempre depende de aprovação administrativa.
-- O funcionário informa data/hora de entrada, data/hora de saída e a referência/motivo do trabalho extra.
-- A solicitação fica PENDENTE e não altera o banco de horas enquanto aguarda análise.
-- O administrador pode APROVAR ou REJEITAR.
-- Somente solicitações APROVADAS entram como horas trabalhadas, horas positivas e saldo.
-- Usa somente Entrada Extra → Saída Extra, sem intervalo.
-- Pode atravessar a meia-noite. Exemplo: 22:15 em um dia → 03:00 no dia seguinte = 4h45.
-- A jornada extra não altera as 8h previstas da jornada normal.
+## Crédito manual no banco de horas
+- O funcionário informa data/hora de entrada, data/hora de saída e a referência/motivo do período adicional.
+- Antes de gravar, a interface mostra uma confirmação com os horários, a duração e a referência para o funcionário validar o lançamento.
+- Após a confirmação, o crédito é efetivado imediatamente; não existe aprovação administrativa.
+- O crédito entra diretamente nas Horas Positivas e no Saldo do banco de horas.
+- Não existe total separado de "Jornada Extra" ou "Crédito Jornada Extra" na apresentação do sistema.
+- O período usa somente Entrada → Saída, sem intervalo.
+- Pode atravessar a meia-noite. Exemplo: 22:15 em um dia → 03:00 no dia seguinte = +4h45 no banco.
+- O crédito não aumenta a jornada prevista de 8h e não é somado às "Horas trabalhadas"; ele é um crédito positivo de banco.
 - O período informado não pode estar no futuro nem ultrapassar 24h.
-- Para fechamento mensal, a jornada extra pertence ao mês/data da Entrada Extra.
-- Solicitações sobrepostas pendentes/aprovadas são bloqueadas para evitar duplicidade.
-- Esta regra registra minutos positivos no banco de horas; não calcula adicional remuneratório, adicional noturno ou percentuais de folha.
-- Registros legados concluídos continuam preservados. Registros legados incompletos não entram nos totais.
+- Para fechamento mensal, o crédito pertence ao mês/data da entrada.
+- Períodos sobrepostos são bloqueados para evitar duplicidade.
+- No relatório mensal, o crédito aparece na mesma linha do dia em uma coluna "Banco +" e já compõe o saldo diário e o total de Horas Positivas.
+- Esta regra não calcula adicional remuneratório, adicional noturno ou percentuais de folha.
+- Registros históricos já aprovados permanecem válidos como créditos positivos.
 
 ## Dias sem registro
 - Um dia útil sem ponto e sem ocorrência continua como SEM REGISTRO.
