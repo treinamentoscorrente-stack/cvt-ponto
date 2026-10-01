@@ -72,13 +72,17 @@ export function downloadTimecardPdf(report:MonthlyReport){
   if(report.employee_reports.length!==1)throw new Error("Selecione somente um funcionário para baixar o cartão ponto.");
 
   const employee=report.employee_reports[0];
-  const workedRows=employee.rows
-    .filter((r:any)=>Number(r.worked_minutes)>0)
+  const cardRows=employee.rows
+    .filter((r:any)=>
+      Number(r.worked_minutes)>0
+      || Number(r.daily_balance_minutes)!==0
+      || r.occurrence_type==="FOLGA"
+    )
     .sort((a:any,b:any)=>String(a.date).localeCompare(String(b.date)));
 
-  if(!workedRows.length)throw new Error("Não há dias trabalhados nesta competência.");
+  if(!cardRows.length)throw new Error("Não há registros ou movimentações de banco nesta competência.");
 
-  const totalWorked=workedRows.reduce((sum:number,r:any)=>sum+Number(r.worked_minutes||0),0);
+  const totalWorked=cardRows.reduce((sum:number,r:any)=>sum+Number(r.worked_minutes||0),0);
   const doc=new jsPDF({orientation:"portrait",unit:"mm",format:"a4",compress:true});
   const pageWidth=doc.internal.pageSize.getWidth();
   const pageHeight=doc.internal.pageSize.getHeight();
@@ -127,10 +131,10 @@ export function downloadTimecardPdf(report:MonthlyReport){
   doc.text(formatCpf(employee.employee_cpf),112,41);
   doc.text(formatDate(employee.admission_date),162,41);
 
-  const fontSize=workedRows.length>=28?5.8:workedRows.length>=24?6.2:6.7;
-  const padding=workedRows.length>=28?.75:workedRows.length>=24?.9:1.1;
+  const fontSize=cardRows.length>=28?5.8:cardRows.length>=24?6.2:6.7;
+  const padding=cardRows.length>=28?.75:cardRows.length>=24?.9:1.1;
 
-  const body=workedRows.map((r:any)=>[
+  const body=cardRows.map((r:any)=>[
     formatDate(r.date),
     clean(r.weekday),
     r.entrada?String(r.entrada).slice(0,5):"-",
@@ -138,11 +142,12 @@ export function downloadTimecardPdf(report:MonthlyReport){
     r.saida?String(r.saida).slice(0,5):"-",
     fmt(Number(r.worked_minutes)),
     fmtSigned(Number(r.daily_balance_minutes||0)),
+    clean(r.status||""),
   ]);
 
   autoTable(doc,{
     startY:47,
-    head:[["Data","Dia","Entrada","Intervalo","Saida","Horas","Banco"]],
+    head:[["Data","Dia","Entrada","Intervalo","Saida","Horas","Banco","Situacao"]],
     body,
     theme:"grid",
     pageBreak:"avoid",
@@ -168,24 +173,32 @@ export function downloadTimecardPdf(report:MonthlyReport){
       lineColor:[205,211,216],
     },
     columnStyles:{
-      0:{cellWidth:24},
-      1:{cellWidth:20},
-      2:{cellWidth:24},
-      3:{cellWidth:38},
-      4:{cellWidth:24},
-      5:{cellWidth:26,fontStyle:"bold"},
-      6:{cellWidth:30,fontStyle:"bold"},
+      0:{cellWidth:22},
+      1:{cellWidth:17},
+      2:{cellWidth:22},
+      3:{cellWidth:32},
+      4:{cellWidth:22},
+      5:{cellWidth:24,fontStyle:"bold"},
+      6:{cellWidth:27,fontStyle:"bold"},
+      7:{cellWidth:33,fontStyle:"bold"},
     },
     didParseCell:(data:any)=>{
       if(data.section==="body"&&data.row.index%2===1){
         data.cell.styles.fillColor=[250,251,252];
       }
-      if(data.section==="body"&&data.column.index===6){
-        const row=workedRows[data.row.index];
+      if(data.section==="body"){
+        const row=cardRows[data.row.index];
         const bank=Number(row?.daily_balance_minutes||0);
-        if(bank>0)data.cell.styles.textColor=[47,112,71];
-        if(bank<0)data.cell.styles.textColor=[153,55,55];
-        if(bank===0)data.cell.styles.textColor=[70,82,92];
+        if(data.column.index===6){
+          if(bank>0)data.cell.styles.textColor=[47,112,71];
+          if(bank<0)data.cell.styles.textColor=[153,55,55];
+          if(bank===0)data.cell.styles.textColor=[70,82,92];
+        }
+        if(data.column.index===7){
+          if(row?.occurrence_type==="FOLGA")data.cell.styles.textColor=[105,86,45];
+          else if(bank>0)data.cell.styles.textColor=[47,112,71];
+          else if(bank<0)data.cell.styles.textColor=[153,55,55];
+        }
       }
     },
   });
@@ -197,35 +210,36 @@ export function downloadTimecardPdf(report:MonthlyReport){
   const finalY=(doc as any).lastAutoTable?.finalY??185;
   const summaryY=Math.min(Math.max(finalY+6,205),235);
 
-  const half=(pageWidth-27)/2;
+  const gap=3;
+  const boxW=(pageWidth-24-gap*3)/4;
+  const summaryItems=[
+    {label:"TRABALHADAS",value:fmt(totalWorked),kind:"neutral"},
+    {label:"POSITIVAS",value:fmt(employee.totals.positive_minutes),kind:"positive"},
+    {label:"NEGATIVAS",value:fmt(employee.totals.negative_minutes),kind:"negative"},
+    {label:"SALDO",value:fmtSigned(employee.totals.balance_minutes),kind:Number(employee.totals.balance_minutes)>0?"positive":Number(employee.totals.balance_minutes)<0?"negative":"neutral"},
+  ];
 
-  doc.setFillColor(248,249,250);
-  doc.setDrawColor(220,224,228);
-  doc.roundedRect(12,summaryY,half,13,2,2,"FD");
-  doc.setTextColor(104,113,121);
-  doc.setFont("helvetica","normal");
-  doc.setFontSize(6.5);
-  doc.text("TOTAL TRABALHADO NO MES",16,summaryY+5);
-  doc.setTextColor(25,32,38);
-  doc.setFont("helvetica","bold");
-  doc.setFontSize(9.5);
-  doc.text(fmt(totalWorked),12+half-5,summaryY+8,{align:"right"});
+  summaryItems.forEach((item,i)=>{
+    const x=12+i*(boxW+gap);
+    if(item.kind==="positive")doc.setFillColor(242,249,244);
+    else if(item.kind==="negative")doc.setFillColor(253,244,244);
+    else doc.setFillColor(248,249,250);
 
-  const bankX=15+half;
-  const monthBalance=Number(employee.totals.balance_minutes||0);
-  doc.setFillColor(monthBalance>0?242:monthBalance<0?253:248,monthBalance>0?249:monthBalance<0?244:249,monthBalance>0?244:monthBalance<0?244:250);
-  doc.setDrawColor(220,224,228);
-  doc.roundedRect(bankX,summaryY,half,13,2,2,"FD");
-  doc.setTextColor(104,113,121);
-  doc.setFont("helvetica","normal");
-  doc.setFontSize(6.5);
-  doc.text("SALDO DO BANCO NO MES",bankX+4,summaryY+5);
-  if(monthBalance>0)doc.setTextColor(47,112,71);
-  else if(monthBalance<0)doc.setTextColor(153,55,55);
-  else doc.setTextColor(25,32,38);
-  doc.setFont("helvetica","bold");
-  doc.setFontSize(9.5);
-  doc.text(fmtSigned(monthBalance),bankX+half-5,summaryY+8,{align:"right"});
+    doc.setDrawColor(220,224,228);
+    doc.roundedRect(x,summaryY,boxW,13,2,2,"FD");
+    doc.setTextColor(104,113,121);
+    doc.setFont("helvetica","normal");
+    doc.setFontSize(5.8);
+    doc.text(item.label,x+3,summaryY+4.5);
+
+    if(item.kind==="positive")doc.setTextColor(47,112,71);
+    else if(item.kind==="negative")doc.setTextColor(153,55,55);
+    else doc.setTextColor(25,32,38);
+
+    doc.setFont("helvetica","bold");
+    doc.setFontSize(8.4);
+    doc.text(item.value,x+boxW-3,summaryY+8.5,{align:"right"});
+  });
 
   // Assinatura fixa no rodapé para manter uma única folha.
   const signatureY=265;
