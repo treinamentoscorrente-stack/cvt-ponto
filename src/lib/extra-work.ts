@@ -69,17 +69,11 @@ export async function extraMinutesForEmployee(employeeId:number, month?:string){
 
 export function totalsWithExtra<T extends {
   worked_minutes:number;positive_minutes:number;negative_minutes:number;balance_minutes:number;pending:number
-}>(base:T,extraMinutes:number){
-  const normalPositive=base.positive_minutes;
-  const bankCredit=extraMinutes;
-  const totalPositive=normalPositive+bankCredit;
+}>(base:T,bankCreditMinutes:number){
   return {
     ...base,
     worked_minutes:base.worked_minutes,
-    normal_positive_minutes:normalPositive,
-    bank_credit_minutes:bankCredit,
-    positive_minutes:totalPositive,
-    balance_minutes:totalPositive-base.negative_minutes,
-    extra_minutes:bankCredit,
+    positive_minutes:base.positive_minutes+bankCreditMinutes,
+    balance_minutes:base.balance_minutes+bankCreditMinutes,
   };
 }
