@@ -2,171 +2,210 @@
 .employeeScreen{
   min-height:100vh;
   padding:0 0 44px;
-  color:#fff;
-  background:
-    radial-gradient(circle at 10% 8%,rgba(255,186,92,.30),transparent 25%),
-    radial-gradient(circle at 90% 18%,rgba(50,181,104,.32),transparent 28%),
-    linear-gradient(145deg,#e96f19 0%,#cb5e18 27%,#2b8a52 62%,#0f5f3b 100%);
-  background-attachment:fixed;
+  color:#1f2933;
+  background:linear-gradient(180deg,#edf1f2 0%,#f6f7f8 38%,#eef1f2 100%);
 }
 .employeeScreen .employeePage{
-  max-width:1040px;
+  max-width:1060px;
   padding:0 20px 48px;
 }
 .employeeScreen .employeeHeader{
-  padding:26px 4px 16px;
-  color:#fff;
+  padding:28px 2px 16px;
+  color:#1f2933;
 }
 .employeeScreen .employeeHeader h1{
-  color:#fff;
-  text-shadow:0 2px 12px rgba(0,0,0,.16);
+  color:#1f2933;
+  font-size:clamp(1.65rem,3vw,2.15rem);
+  letter-spacing:-.02em;
 }
 .employeeScreen .eyebrow{
-  color:rgba(255,255,255,.78);
+  color:#6f7a83;
 }
-.employeeScreen .employeeLogout,
-.employeeScreen .employeeSecondaryButton{
-  color:#fff;
-  border-color:rgba(255,255,255,.42);
-  background:rgba(255,255,255,.12);
-  backdrop-filter:blur(8px);
+.employeeScreen .employeeLogout{
+  color:#33423b;
+  border-color:#ccd4d8;
+  background:#fff;
+  box-shadow:0 3px 10px rgba(26,39,47,.05);
 }
-.employeeScreen .employeeLogout:hover,
-.employeeScreen .employeeSecondaryButton:hover{
-  background:rgba(255,255,255,.22);
-}
-.employeeScreen .clockPanel,
-.employeeScreen .panel,
-.employeeScreen .metric{
-  color:#fff;
-  border:1px solid rgba(255,255,255,.22);
-  box-shadow:0 14px 36px rgba(20,54,36,.15);
-  backdrop-filter:blur(12px);
+.employeeScreen .employeeLogout:hover{
+  background:#f7f9f9;
+  border-color:#b8c3c8;
 }
 .employeeScreen .clockPanel{
-  background:linear-gradient(135deg,rgba(13,111,67,.96) 0%,rgba(27,142,82,.94) 42%,rgba(234,108,22,.94) 100%);
+  color:#fff;
+  border:1px solid rgba(255,255,255,.08);
+  background:linear-gradient(135deg,#202b30 0%,#263b34 58%,#31513f 100%);
+  box-shadow:0 18px 38px rgba(32,43,48,.16);
   padding:34px 22px;
 }
-.employeeScreen .employeeMetricCard{
-  background:linear-gradient(135deg,rgba(16,108,68,.94),rgba(229,106,24,.92));
+.employeeScreen .clockPanel .dateLine,
+.employeeScreen .clockPanel .serverNote{
+  color:rgba(255,255,255,.72);
 }
-.employeeScreen .employeeMetricCard:nth-child(2){
-  background:linear-gradient(135deg,rgba(37,142,82,.96),rgba(239,126,34,.92));
-}
-.employeeScreen .employeeMetricCard:nth-child(3){
-  background:linear-gradient(135deg,rgba(224,104,27,.94),rgba(31,125,75,.95));
-}
-.employeeScreen .employeeMetricCard:nth-child(4){
-  background:linear-gradient(135deg,rgba(11,94,58,.96),rgba(210,89,19,.94));
-}
-.employeeScreen .metric span,
-.employeeScreen .dateLine,
-.employeeScreen .punchGrid span{
-  color:rgba(255,255,255,.78);
-}
-.employeeScreen .metric strong,
-.employeeScreen .liveClock,
-.employeeScreen .nextPunch,
-.employeeScreen .punchGrid strong,
-.employeeScreen .panel h2,
-.employeeScreen .panel td,
-.employeeScreen .panel label{
+.employeeScreen .clockPanel .liveClock,
+.employeeScreen .clockPanel .nextPunch{
   color:#fff;
-}
-.employeeScreen .employeeTodayPanel{
-  background:linear-gradient(135deg,rgba(14,104,64,.93),rgba(33,139,80,.90) 46%,rgba(222,99,20,.90));
-}
-.employeeScreen .employeeAdjustPanel{
-  background:linear-gradient(135deg,rgba(12,95,59,.96),rgba(24,126,73,.93) 58%,rgba(224,103,21,.90));
-}
-.employeeScreen .employeeExtraPanel{
-  background:linear-gradient(135deg,rgba(229,105,22,.95),rgba(201,82,15,.92) 42%,rgba(25,123,72,.94));
-}
-.employeeScreen .employeeTablePanel{
-  background:linear-gradient(135deg,rgba(13,91,57,.95),rgba(39,121,74,.92) 54%,rgba(199,84,18,.88));
-}
-.employeeScreen .employeeExtraHistory{
-  background:linear-gradient(135deg,rgba(217,96,20,.93),rgba(38,126,76,.94));
-}
-.employeeScreen .employeeRecentPanel{
-  background:linear-gradient(135deg,rgba(10,86,54,.96),rgba(35,119,73,.93),rgba(184,75,15,.88));
-}
-.employeeScreen .badge{
-  color:#fff;
-  border-color:rgba(255,255,255,.34);
-  background:rgba(255,255,255,.14);
-}
-.employeeScreen .serverNote{
-  color:rgba(255,255,255,.88);
-}
-.employeeScreen .punchGrid>div{
-  color:#fff;
-  border-color:rgba(255,255,255,.20);
-  background:rgba(255,255,255,.10);
-}
-.employeeScreen input,
-.employeeScreen select{
-  color:#173b2b;
-  background:rgba(255,255,255,.95);
-  border-color:rgba(255,255,255,.74);
-  box-shadow:none;
-}
-.employeeScreen input::placeholder{
-  color:#71817a;
-}
-.employeeScreen input:focus,
-.employeeScreen select:focus{
-  border-color:#fff;
-  box-shadow:0 0 0 4px rgba(255,255,255,.18);
-}
-.employeeScreen .employeePrimaryButton{
-  color:#fff;
-  border-color:rgba(255,255,255,.34);
-  background:linear-gradient(135deg,#ee7a1e,#d85d11);
-  box-shadow:0 8px 18px rgba(95,45,13,.16);
-}
-.employeeScreen .employeePrimaryButton:hover{
-  background:linear-gradient(135deg,#f1872d,#c9510c);
 }
 .employeeScreen .punchButton{
   color:#fff;
-  border:1px solid rgba(255,255,255,.30);
-  background:linear-gradient(135deg,#f18a2d,#df6618);
-  box-shadow:0 10px 24px rgba(99,48,15,.22);
+  border:1px solid #e7761b;
+  background:linear-gradient(180deg,#f28a31,#e46f16);
+  box-shadow:0 9px 22px rgba(183,82,15,.20);
 }
 .employeeScreen .punchButton:hover:not(:disabled){
-  background:linear-gradient(135deg,#f69b45,#d95b10);
+  background:linear-gradient(180deg,#f3984b,#dc650f);
 }
 .employeeScreen .punchButton:disabled{
-  color:rgba(255,255,255,.72);
-  background:rgba(255,255,255,.14);
+  color:rgba(255,255,255,.66);
+  border-color:rgba(255,255,255,.12);
+  background:rgba(255,255,255,.10);
+  box-shadow:none;
+}
+.employeeScreen .employeeMetrics{
+  gap:12px;
+}
+.employeeScreen .employeeMetricCard{
+  position:relative;
+  overflow:hidden;
+  color:#1f2933;
+  border:1px solid #dce2e5;
+  background:linear-gradient(180deg,#ffffff 0%,#f9fbfa 100%);
+  box-shadow:0 8px 20px rgba(37,48,55,.06);
+}
+.employeeScreen .employeeMetricCard::before{
+  content:"";
+  position:absolute;
+  inset:0 auto 0 0;
+  width:4px;
+  background:#7b8790;
+}
+.employeeScreen .employeeMetricCard:nth-child(2)::before{background:#2f7b53}
+.employeeScreen .employeeMetricCard:nth-child(3)::before{background:#9c5650}
+.employeeScreen .employeeMetricCard:nth-child(4)::before{background:#df7a25}
+.employeeScreen .employeeMetricCard span{
+  color:#74808a;
+}
+.employeeScreen .employeeMetricCard strong{
+  color:#202b30;
+}
+.employeeScreen .panel{
+  color:#1f2933;
+  border:1px solid #dce2e5;
+  background:#fff;
+  box-shadow:0 8px 22px rgba(37,48,55,.055);
+}
+.employeeScreen .employeeTodayPanel{
+  border-top:4px solid #586870;
+  background:linear-gradient(180deg,#fff 0%,#fafbfb 100%);
+}
+.employeeScreen .employeeAdjustPanel{
+  border-top:4px solid #2f7b53;
+  background:linear-gradient(180deg,#fff 0%,#f9fbfa 100%);
+}
+.employeeScreen .employeeExtraPanel{
+  border-top:4px solid #df7a25;
+  background:linear-gradient(180deg,#fff 0%,#fffaf6 100%);
+}
+.employeeScreen .employeeTablePanel{
+  border-top:3px solid #c7d0d4;
+  background:#fff;
+}
+.employeeScreen .employeeExtraHistory{
+  border-top-color:#df7a25;
+}
+.employeeScreen .employeeRecentPanel{
+  border-top-color:#2f7b53;
+}
+.employeeScreen .panel h2,
+.employeeScreen .panel label,
+.employeeScreen .panel td{
+  color:#263238;
+}
+.employeeScreen .panel .eyebrow{
+  color:#7a858d;
+}
+.employeeScreen .badge{
+  color:#476057;
+  border-color:#cdd9d3;
+  background:#f3f8f5;
+}
+.employeeScreen .serverNote{
+  color:#517061;
+}
+.employeeScreen .punchGrid>div{
+  color:#263238;
+  border-color:#e1e6e8;
+  background:#f7f9f9;
+}
+.employeeScreen .punchGrid span{
+  color:#7a858d;
+}
+.employeeScreen .punchGrid strong{
+  color:#263238;
+}
+.employeeScreen input,
+.employeeScreen select{
+  color:#263238;
+  background:#fff;
+  border-color:#cdd5d9;
+  box-shadow:none;
+}
+.employeeScreen input::placeholder{
+  color:#8d979e;
+}
+.employeeScreen input:focus,
+.employeeScreen select:focus{
+  border-color:#5d8b73;
+  box-shadow:0 0 0 4px rgba(47,123,83,.10);
+}
+.employeeScreen .employeePrimaryButton{
+  color:#fff;
+  border-color:#d96e1c;
+  background:#e87922;
+  box-shadow:none;
+}
+.employeeScreen .employeePrimaryButton:hover{
+  background:#d96a16;
+}
+.employeeScreen .employeeSecondaryButton{
+  color:#355145;
+  border-color:#c9d4cf;
+  background:#f7faf8;
+}
+.employeeScreen .employeeSecondaryButton:hover{
+  background:#eef5f1;
 }
 .employeeScreen .employeeTablePanel table{
-  background:rgba(15,67,46,.12);
+  background:#fff;
+  border:1px solid #e2e7e9;
   border-radius:10px;
   overflow:hidden;
 }
 .employeeScreen .employeeTablePanel th{
-  color:#fff;
-  background:rgba(255,255,255,.14);
-  border-bottom-color:rgba(255,255,255,.20);
+  color:#66727a;
+  background:#f4f6f7;
+  border-bottom-color:#dfe4e7;
 }
 .employeeScreen .employeeTablePanel td{
-  border-bottom-color:rgba(255,255,255,.15);
-  background:rgba(255,255,255,.035);
+  color:#2b363c;
+  border-bottom-color:#e7ebed;
+  background:#fff;
+}
+.employeeScreen .employeeTablePanel tbody tr:nth-child(even) td{
+  background:#fbfcfc;
 }
 .employeeScreen .employeeTablePanel tbody tr:hover td{
-  background:rgba(255,255,255,.08);
+  background:#f5f8f7;
 }
 .employeeScreen .employeeAlert{
-  color:#fff;
-  border-color:rgba(255,215,211,.44);
-  background:rgba(139,28,22,.42);
+  color:#8c2d25;
+  border-color:#e4b9b5;
+  background:#fff5f4;
 }
 .employeeScreen .employeeNotice{
-  color:#fff;
-  border:1px solid rgba(255,255,255,.26);
-  background:rgba(255,255,255,.13);
+  color:#2f6949;
+  border:1px solid #c9dfd1;
+  background:#f1f8f4;
 }
 @media(max-width:900px){.loginCard{grid-template-columns:1fr}.loginHero,.loginForm{padding:32px}.sidebar{position:static;width:100%;flex-direction:row;align-items:center;flex-wrap:wrap}.sideBrand{border:0;padding:0;margin-right:auto}.sidebar nav{display:flex;gap:6px;flex-wrap:wrap}.logout{margin:0}.content{margin-left:0}.employeeMetrics{grid-template-columns:repeat(2,minmax(0,1fr))}.reportTools{grid-template-columns:1fr 1fr}.reportActions{grid-column:1/-1}}@media(max-width:620px){.employeeScreen .employeePage{padding:0 12px 32px}.employeeScreen .employeeHeader{padding:20px 2px 12px}.employeeScreen .clockPanel{padding:27px 14px}.employeeScreen .panel{padding:15px}.employeeScreen .employeeMetrics{gap:8px}.loginPage{padding:10px}.loginHero,.loginForm{padding:23px}.content{padding:15px}.metrics,.employeeMetrics,.formGrid,.reportTools,.reportSummary{grid-template-columns:1fr}.reportActions{grid-column:auto}.topbar,.employeeHeader{align-items:flex-start}.punchGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media print{
   @page{size:A4 landscape;margin:7mm}
