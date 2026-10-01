@@ -74,6 +74,12 @@ A folga consome saldo do banco de horas no momento em que é cadastrada. Se não
 - Esta regra não calcula adicional remuneratório, adicional noturno ou percentuais de folha.
 - Registros históricos já aprovados permanecem válidos como créditos positivos.
 
+## Feriado trabalhado
+- Feriado sem registro de trabalho permanece neutro no banco de horas.
+- Quando houver jornada registrada em feriado de dia útil, o sistema compara as horas trabalhadas com a jornada normal prevista do dia.
+- Exemplo: 8h trabalhadas em um feriado com jornada normal de 8h = saldo 0h.
+- O feriado continua identificado no relatório; ele apenas deixa de gerar crédito positivo automático pelas horas normais do dia.
+
 ## Dias sem registro
 - Um dia útil sem ponto e sem ocorrência continua como SEM REGISTRO.
 - O sistema não debita automaticamente 8h nesses casos.
