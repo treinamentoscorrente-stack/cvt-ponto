@@ -31,10 +31,14 @@ export type DaySummary = {
   holiday_description: string | null;
 };
 
-async function regularWeekdayExpected(date: string) {
-  if (weekend(date)) return 0;
+async function companyDailyMinutes() {
   const company = await db.query(`SELECT daily_minutes FROM company WHERE id=1`);
   return Number(company.rows[0]?.daily_minutes ?? 480);
+}
+
+async function regularWeekdayExpected(date: string, suppliedDailyMinutes?: number) {
+  if (weekend(date)) return 0;
+  return suppliedDailyMinutes ?? companyDailyMinutes();
 }
 
 export async function baseExpected(date: string) {
@@ -100,7 +104,7 @@ function outcome(balance: number) {
   return balance > 0 ? "POSITIVO" : balance < 0 ? "NEGATIVO" : "CUMPRIDA";
 }
 
-function calcWorked(by: Record<string,string>, occurrence: DayOccurrence | null) {
+function calcWorked(by: Record<string,string>) {
   if (by.ENTRADA && by.SAIDA && !by.INTERVALO_INICIO && !by.INTERVALO_FIM) {
     return timeMinutes(by.SAIDA) - timeMinutes(by.ENTRADA);
   }
@@ -111,12 +115,27 @@ function calcWorked(by: Record<string,string>, occurrence: DayOccurrence | null)
   return null;
 }
 
+function expectedForOccurrence(base: number, occurrence: DayOccurrence | null) {
+  if (!occurrence) return base;
+  if (occurrence.occurrence_type === "ATESTADO") return 0;
+  if (occurrence.occurrence_type === "FOLGA") {
+    return occurrence.period === "DIA_TODO" ? 0 : Math.round(base / 2);
+  }
+  return base;
+}
+
+function debitForOccurrence(base: number, occurrence: DayOccurrence | null) {
+  if (occurrence?.occurrence_type !== "FOLGA") return 0;
+  return occurrence.period === "DIA_TODO" ? base : Math.round(base / 2);
+}
+
 export async function summarizeRows(
   employeeId: number,
   date: string,
   rows: Array<{punch_type:string;punch_time:string}>,
   suppliedOccurrence?: DayOccurrence | null,
   suppliedHoliday?: string | null,
+  suppliedDailyMinutes?: number,
 ): Promise<DaySummary> {
   const occurrence = suppliedOccurrence === undefined ? await getOccurrence(employeeId, date) : suppliedOccurrence;
   let holidayDescription = suppliedHoliday ?? null;
@@ -125,18 +144,19 @@ export async function summarizeRows(
     holidayDescription = h.rows[0]?.description ?? null;
   }
 
+  const regularExpected = await regularWeekdayExpected(date, suppliedDailyMinutes);
+  const base = holidayDescription ? 0 : regularExpected;
   const by = Object.fromEntries(rows.map(r => [r.punch_type, String(r.punch_time).slice(0,8)]));
   const nowDate = saoPauloNow().date;
   const future = date > nowDate;
   const occurrenceLabel = labelOccurrence(occurrence);
-  let expected = await dailyExpected(date, occurrence);
-  const bankDebit = await bankDebitMinutes(date, occurrence);
+  let expected = expectedForOccurrence(base, occurrence);
+  const bankDebit = debitForOccurrence(base, occurrence);
 
-  // Feriado sem trabalho continua neutro. Se houver jornada registrada em um
-  // feriado de dia útil, comparamos o trabalho com a jornada normal do dia
-  // para não transformar automaticamente toda a carga horária em saldo positivo.
+  // Em feriado de dia útil com jornada registrada, a carga normal do dia é
+  // usada como referência para não transformar toda a jornada em saldo positivo.
   if (holidayDescription && rows.length > 0 && !occurrence) {
-    expected = await regularWeekdayExpected(date);
+    expected = regularExpected;
   }
 
   let worked: number | null = null;
@@ -171,7 +191,7 @@ export async function summarizeRows(
     balance = 0;
     status = "FIM DE SEMANA";
   } else {
-    worked = calcWorked(by, occurrence);
+    worked = calcWorked(by);
     if (worked !== null) {
       balance = worked - expected - bankDebit;
       const result = outcome(balance);
@@ -235,13 +255,15 @@ export async function summariesForEmployee(employeeId: number, month?: string) {
   const values: any[] = [employeeId];
   let punchFilter = "employee_id=$1";
   let occurrenceFilter = "employee_id=$1";
+
   if (month) {
-    values.push(`${month}-%`);
-    punchFilter += " AND work_date::text LIKE $2";
-    occurrenceFilter += " AND work_date::text LIKE $2";
+    const monthStart = `${month}-01`;
+    values.push(monthStart);
+    punchFilter += " AND work_date >= $2::date AND work_date < ($2::date + interval '1 month')";
+    occurrenceFilter += " AND work_date >= $2::date AND work_date < ($2::date + interval '1 month')";
   }
 
-  const [punchResult, occurrenceResult] = await Promise.all([
+  const [punchResult, occurrenceResult, dailyMinutes] = await Promise.all([
     db.query(
       `SELECT work_date::text AS work_date,punch_time::text AS punch_time,punch_type
        FROM punches WHERE ${punchFilter} ORDER BY work_date DESC,punch_time ASC`,
@@ -252,6 +274,7 @@ export async function summariesForEmployee(employeeId: number, month?: string) {
        FROM attendance_occurrences WHERE ${occurrenceFilter} ORDER BY work_date DESC`,
       values,
     ),
+    companyDailyMinutes(),
   ]);
 
   const grouped = new Map<string,Array<{punch_type:string;punch_time:string}>>();
@@ -280,6 +303,7 @@ export async function summariesForEmployee(employeeId: number, month?: string) {
 
     const [year,monthNumber] = month.split("-").map(Number);
     const monthStart = `${month}-01`;
+    const nextMonthStart = new Date(Date.UTC(year, monthNumber, 1)).toISOString().slice(0,10);
     const monthEnd = new Date(Date.UTC(year, monthNumber, 0)).toISOString().slice(0,10);
     const today = saoPauloNow().date;
     const effectiveEnd = month < today.slice(0,7) ? monthEnd : month === today.slice(0,7) ? today : "";
@@ -296,8 +320,9 @@ export async function summariesForEmployee(employeeId: number, month?: string) {
 
     const h = await db.query(
       `SELECT holiday_date::text AS holiday_date,description
-       FROM holidays WHERE holiday_date::text LIKE $1 AND holiday_date >= $2::date`,
-      [`${month}-%`, admission],
+       FROM holidays
+       WHERE holiday_date >= $1::date AND holiday_date < $2::date AND holiday_date >= $3::date`,
+      [monthStart, nextMonthStart, admission],
     );
     for (const row of h.rows) {
       if (!effectiveEnd || row.holiday_date <= effectiveEnd) {
@@ -305,6 +330,13 @@ export async function summariesForEmployee(employeeId: number, month?: string) {
         holidays.set(row.holiday_date, row.description);
       }
     }
+  } else if (dates.size) {
+    const h = await db.query(
+      `SELECT holiday_date::text AS holiday_date,description
+       FROM holidays WHERE holiday_date::text = ANY($1::text[])`,
+      [Array.from(dates)],
+    );
+    for (const row of h.rows) holidays.set(row.holiday_date, row.description);
   }
 
   const out: DaySummary[] = [];
@@ -314,7 +346,8 @@ export async function summariesForEmployee(employeeId: number, month?: string) {
       date,
       grouped.get(date) ?? [],
       occurrences.get(date) ?? null,
-      holidays.get(date),
+      holidays.get(date) ?? null,
+      dailyMinutes,
     ));
   }
   out.sort((a,b) => b.date.localeCompare(a.date));
