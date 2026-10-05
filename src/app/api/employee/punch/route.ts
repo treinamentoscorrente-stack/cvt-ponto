@@ -1,22 +1,20 @@
 import { NextResponse } from "next/server";
-import { requireSession } from "@/lib/auth";
+import { requireSession, validCsrf } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { expectedPunchTypes, type DayOccurrence } from "@/lib/ponto";
 import { saoPauloNow } from "@/lib/time";
 import { jsonError } from "@/lib/http";
-import { clientIp } from "@/lib/security";
+import { assertSameOrigin, clientIp } from "@/lib/security";
 import { audit } from "@/lib/audit";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
-    const origin = request.headers.get("origin");
-    const requestOrigin = new URL(request.url).origin;
-    if (!origin || origin !== requestOrigin) return jsonError("Origem inválida.", 403);
-
+    assertSameOrigin(request);
     const auth = await requireSession("employee");
     if (!auth.ok) return jsonError(auth.error, auth.status);
+    if (!validCsrf(request, auth.session)) return jsonError("Token de segurança inválido.", 403);
 
     const now = saoPauloNow();
     const client = await db.connect();
@@ -24,12 +22,12 @@ export async function POST(request: Request) {
 
     try {
       await client.query("BEGIN");
-      const emp = (await client.query(
+      const employee = (await client.query(
         `SELECT status FROM employees WHERE id=$1 FOR UPDATE`,
         [auth.session.userId],
       )).rows[0];
 
-      if (!emp || emp.status !== "ATIVO") {
+      if (!employee || employee.status !== "ATIVO") {
         await client.query("ROLLBACK");
         return jsonError("Funcionário inativo.", 403);
       }
@@ -53,21 +51,21 @@ export async function POST(request: Request) {
         return jsonError(`Registro de ponto bloqueado: há ${label} lançado para hoje.`, 409);
       }
 
-      const p = await client.query(
+      const punches = await client.query(
         `SELECT punch_time::text AS punch_time,punch_type
          FROM punches WHERE employee_id=$1 AND work_date=$2 ORDER BY punch_time`,
         [auth.session.userId, now.date],
       );
 
-      const existing = new Set(p.rows.map(r => String(r.punch_type)));
-      const next = sequence.find(t => !existing.has(t));
+      const existing = new Set(punches.rows.map(row => String(row.punch_type)));
+      const next = sequence.find(punchType => !existing.has(punchType));
       if (!next) {
         await client.query("ROLLBACK");
         return jsonError("Jornada do dia já concluída.", 409);
       }
 
       type = next;
-      const last = p.rows.at(-1)?.punch_time;
+      const last = punches.rows.at(-1)?.punch_time;
       if (last && now.time <= last) {
         await client.query("ROLLBACK");
         return jsonError("Aguarde um instante para registrar a próxima batida.", 409);
