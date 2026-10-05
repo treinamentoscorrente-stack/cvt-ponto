@@ -46,14 +46,17 @@ export default function AdminDashboard({
 
     <div className="panel adminDashboardMonth">
       <div className="sectionHead dashboardMonthHead">
-        <div><p className="eyebrow">VISÃO POR MÊS</p><h2>Banco de horas mensal</h2><p className="dashboardHelper">Selecione o mês para consultar rapidamente o saldo de cada funcionário.</p></div>
+        <div><p className="eyebrow">VISÃO POR MÊS</p><h2>Banco de horas mensal</h2><p className="dashboardHelper">Selecione o mês para consultar trabalhado, horas positivas, negativas e saldo de cada funcionário.</p></div>
         <label className="dashboardMonthFilter">Mês<input type="month" value={month} max={todaySaoPaulo().slice(0,7)} onChange={event=>onMonthChange(event.target.value)} /></label>
       </div>
       <div className="tableWrap dashboardMonthTable">
         <table>
-          <thead><tr><th>Funcionário</th><th>Horas</th></tr></thead>
+          <thead><tr><th>Funcionário</th><th>Trabalhado geral</th><th>Positivas geral</th><th>Negativas geral</th><th>Banco atual</th></tr></thead>
           <tbody>{data?.monthly_employees?.map(employee=><tr key={employee.id}>
             <td><strong>{employee.name}</strong></td>
+            <td>{formatMinutes(employee.totals.worked_minutes)}</td>
+            <td className="bankPositive">{formatMinutes(employee.totals.positive_minutes)}</td>
+            <td className="bankNegative">{formatMinutes(employee.totals.negative_minutes)}</td>
             <td className={employee.totals.balance_minutes>=0?"bankBalance positive":"bankBalance negative"}>{formatMinutes(employee.totals.balance_minutes,true)}</td>
           </tr>)}</tbody>
         </table>
