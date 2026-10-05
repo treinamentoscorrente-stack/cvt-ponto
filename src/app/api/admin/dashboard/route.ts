@@ -21,11 +21,9 @@ export async function GET(request:Request){
   if(!MONTH_RE.test(requestedMonth))return jsonError("Competência inválida.",400);
 
   const allGeneral:any[]=[];
-  const allMonthly:any[]=[];
   const generalEmployees:any[]=[];
   const monthlyEmployees:any[]=[];
   let allGeneralExtra=0;
-  let allMonthlyExtra=0;
 
   for(const employee of employees){
     const id=Number(employee.id);
@@ -37,9 +35,7 @@ export async function GET(request:Request){
     ]);
 
     allGeneral.push(...generalSummaries);
-    allMonthly.push(...monthlySummaries);
     allGeneralExtra+=generalExtra;
-    allMonthlyExtra+=monthlyExtra;
 
     const todaySummary=generalSummaries.find(v=>v.date===today);
     const base={
@@ -68,7 +64,6 @@ export async function GET(request:Request){
     totals:totalsWithExtra(aggregate(allGeneral),allGeneralExtra),
     employees:generalEmployees,
     month:requestedMonth,
-    monthly_totals:totalsWithExtra(aggregate(allMonthly),allMonthlyExtra),
     monthly_employees:monthlyEmployees,
   },{headers:{"cache-control":"no-store"}});
 }
