@@ -92,3 +92,12 @@ Browser -> Next.js/Vercel -> API Routes -> Neon PostgreSQL
 ```
 
 Consulte `docs/DEPLOY-VERCEL-NEON.md` para procedimentos de implantação e manutenção.
+
+
+## Aplicativo móvel
+
+O projeto possui uma aplicação móvel separada em `mobile/`, baseada em Capacitor 8.
+
+A arquitetura móvel mantém o backend e as regras de negócio no Next.js/Vercel e usa autenticação Bearer própria para dispositivos móveis, com access token curto, refresh token rotativo e armazenamento seguro no Keychain/Keystore.
+
+Consulte `mobile/README.md` para configuração e geração dos projetos Android/iOS.
