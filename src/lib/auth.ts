@@ -84,17 +84,25 @@ export async function createMobileSession(role:SessionRole,userId:number,deviceN
 }
 
 export async function refreshMobileSession(refreshToken:string){
-  const refreshHash=sha256(refreshToken);
-  const current=(await db.query(
-    `SELECT id,role,user_id
-     FROM mobile_sessions
-     WHERE refresh_token_hash=$1
+  const accessToken=randomToken(32);
+  const nextRefreshToken=randomToken(48);
+  const accessExpiresAt=new Date(Date.now()+MOBILE_ACCESS_MINUTES*60_000);
+  const refreshExpiresAt=new Date(Date.now()+MOBILE_REFRESH_DAYS*24*3600_000);
+
+  const updated=await db.query(
+    `UPDATE mobile_sessions
+     SET access_token_hash=$1,refresh_token_hash=$2,
+         access_expires_at=$3,refresh_expires_at=$4,last_seen_at=NOW()
+     WHERE refresh_token_hash=$5
        AND revoked_at IS NULL
        AND refresh_expires_at>NOW()
-     FOR UPDATE`,
-    [refreshHash],
-  )).rows[0];
-
+     RETURNING id,role,user_id`,
+    [
+      sha256(accessToken),sha256(nextRefreshToken),
+      accessExpiresAt,refreshExpiresAt,sha256(refreshToken),
+    ],
+  );
+  const current=updated.rows[0];
   if(!current)return null;
 
   const role=current.role as SessionRole;
@@ -106,22 +114,6 @@ export async function refreshMobileSession(refreshToken:string){
       return null;
     }
   }
-
-  const accessToken=randomToken(32);
-  const nextRefreshToken=randomToken(48);
-  const accessExpiresAt=new Date(Date.now()+MOBILE_ACCESS_MINUTES*60_000);
-  const refreshExpiresAt=new Date(Date.now()+MOBILE_REFRESH_DAYS*24*3600_000);
-
-  await db.query(
-    `UPDATE mobile_sessions
-     SET access_token_hash=$1,refresh_token_hash=$2,
-         access_expires_at=$3,refresh_expires_at=$4,last_seen_at=NOW()
-     WHERE id=$5`,
-    [
-      sha256(accessToken),sha256(nextRefreshToken),
-      accessExpiresAt,refreshExpiresAt,current.id,
-    ],
-  );
 
   return {
     role,
