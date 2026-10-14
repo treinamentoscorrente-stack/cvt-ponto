@@ -18,7 +18,8 @@
     "@capacitor/core": "^8.0.0",
     "@capacitor/ios": "^8.0.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "@aparajita/capacitor-biometric-auth": "^10.0.0"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.0.0",
