@@ -3,6 +3,7 @@ import { SecureStorage } from "@aparajita/capacitor-secure-storage";
 const PREFIX="cvt-ponto_";
 const ACCESS="access-token";
 const REFRESH="refresh-token";
+const BIOMETRIC="biometric-enabled";
 
 let initialized=false;
 
@@ -29,6 +30,17 @@ export async function accessToken(){
 export async function refreshToken(){
   await init();
   return SecureStorage.getItem(REFRESH);
+}
+
+export async function biometricEnabled(){
+  await init();
+  return (await SecureStorage.getItem(BIOMETRIC))==="1";
+}
+
+export async function setBiometricEnabled(enabled:boolean){
+  await init();
+  if(enabled)await SecureStorage.setItem(BIOMETRIC,"1");
+  else await SecureStorage.removeItem(BIOMETRIC);
 }
 
 export async function clearTokens(){
