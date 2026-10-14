@@ -86,3 +86,25 @@ Próximas etapas previstas:
 - históricos completos;
 - biometria para desbloqueio local;
 - notificações push.
+
+
+## Biometria
+
+O aplicativo suporta proteção opcional por Face ID, Touch ID, impressão digital e, quando permitido pelo sistema, credencial segura do aparelho.
+
+O recurso é opt-in: o funcionário ativa a proteção dentro do próprio app e precisa confirmar sua identidade no aparelho.
+
+### iOS
+
+Depois de gerar o projeto iOS com `npm run cap:add:ios`, adicione ao `Info.plist`:
+
+```xml
+<key>NSFaceIDUsageDescription</key>
+<string>O CVT Ponto usa o Face ID para proteger o acesso aos seus registros de jornada.</string>
+```
+
+Sem essa chave, o iOS não permite o uso do Face ID pelo aplicativo.
+
+### Android
+
+A autenticação é apresentada pelo prompt de segurança do próprio Android. A disponibilidade real depende do hardware, da biometria cadastrada e das políticas de segurança do aparelho.
