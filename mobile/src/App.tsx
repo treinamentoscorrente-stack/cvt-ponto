@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { accessToken } from "./auth";
+import { BiometricAuth } from "@aparajita/capacitor-biometric-auth";
+import { accessToken, biometricEnabled, setBiometricEnabled } from "./auth";
 import { api, login, logout } from "./api";
 
 const labels:Record<string,string>={
@@ -62,6 +63,9 @@ export default function App(){
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
   const [busy,setBusy]=useState(false);
+  const [biometricAvailable,setBiometricAvailable]=useState(false);
+  const [biometricOn,setBiometricOn]=useState(false);
+  const [locked,setLocked]=useState(false);
 
   const [adjustDate,setAdjustDate]=useState(todaySP());
   const [adjustLoaded,setAdjustLoaded]=useState(false);
@@ -96,11 +100,77 @@ export default function App(){
     }
   }
 
-  useEffect(()=>{void (async()=>{
-    const token=await accessToken();
-    if(token)await load();
-    else setReady(true);
-  })();},[]);
+  async function authenticateDevice(){
+    await BiometricAuth.authenticate({
+      reason:"Desbloquear o CVT Ponto",
+      cancelTitle:"Cancelar",
+      allowDeviceCredential:true,
+      iosFallbackTitle:"Usar código do aparelho",
+      androidTitle:"CVT Ponto",
+      androidSubtitle:"Confirme sua identidade para acessar o ponto",
+      androidConfirmationRequired:false,
+    });
+  }
+
+  async function unlock(){
+    setError("");
+    try{
+      await authenticateDevice();
+      setLocked(false);
+      if(!authenticated)await load();
+    }catch{
+      setLocked(true);
+    }
+  }
+
+  useEffect(()=>{let listener:{remove:()=>Promise<void>}|undefined;
+    void (async()=>{
+      const [token,enabled]=await Promise.all([accessToken(),biometricEnabled()]);
+      setBiometricOn(enabled);
+
+      try{
+        const info=await BiometricAuth.checkBiometry();
+        const available=info.isAvailable||info.deviceIsSecure;
+        setBiometricAvailable(available);
+
+        listener=await BiometricAuth.addResumeListener(()=>{
+          void (async()=>{
+            const shouldLock=await biometricEnabled();
+            const currentToken=await accessToken();
+            if(!shouldLock||!currentToken)return;
+            setLocked(true);
+            try{
+              await authenticateDevice();
+              setLocked(false);
+            }catch{
+              setLocked(true);
+            }
+          })();
+        });
+
+        if(token&&enabled&&available){
+          setLocked(true);
+          try{
+            await authenticateDevice();
+            setLocked(false);
+            await load();
+          }catch{
+            setReady(true);
+          }
+        }else if(token){
+          await load();
+        }else{
+          setReady(true);
+        }
+      }catch{
+        setBiometricAvailable(false);
+        if(token)await load();
+        else setReady(true);
+      }
+    })();
+
+    return()=>{void listener?.remove();};
+  },[]);
 
   async function submit(event:FormEvent){
     event.preventDefault();
@@ -189,9 +259,30 @@ export default function App(){
     finally{setBusy(false);}
   }
 
+  async function toggleBiometric(){
+    if(!biometricAvailable)return;
+    setError("");
+    try{
+      if(!biometricOn){
+        await authenticateDevice();
+        await setBiometricEnabled(true);
+        setBiometricOn(true);
+        setNotice("Proteção do aplicativo ativada neste aparelho.");
+      }else{
+        await setBiometricEnabled(false);
+        setBiometricOn(false);
+        setNotice("Proteção do aplicativo desativada neste aparelho.");
+      }
+    }catch{
+      setError("Não foi possível confirmar a identidade no aparelho.");
+    }
+  }
+
   async function exit(){
     setBusy(true);
     await logout();
+    await setBiometricEnabled(false);
+    setBiometricOn(false);
     setAuthenticated(false);
     setData(null);
     setAdjustments([]);
@@ -203,6 +294,16 @@ export default function App(){
     ||(data?.today?.occurrence_type==="FOLGA"&&data?.today?.occurrence_period==="DIA_TODO"),[data]);
 
   if(!ready)return <main className="center"><div className="loader">CVT</div></main>;
+
+  if(locked)return <main className="login">
+    <section className="loginCard lockCard">
+      <div className="brand">CVT</div>
+      <p className="eyebrow">ACESSO PROTEGIDO</p>
+      <h1>CVT Ponto bloqueado</h1>
+      <p className="sub">Confirme sua identidade no aparelho para continuar.</p>
+      <button onClick={unlock}>DESBLOQUEAR</button>
+    </section>
+  </main>;
 
   if(!authenticated)return <main className="login">
     <section className="loginCard">
@@ -318,6 +419,17 @@ export default function App(){
         </article>):<p className="empty">Nenhuma hora adicional lançada.</p>}
       </div>
     </section>
+
+    {biometricAvailable&&<section className="panel securityPanel">
+      <div className="sectionTitle">
+        <div><p className="eyebrow">SEGURANÇA</p><h2>Proteção do aplicativo</h2></div>
+        <span className={`status ${biometricOn?"aprovado":"pendente"}`}>{biometricOn?"Ativada":"Opcional"}</span>
+      </div>
+      <p className="securityText">Use Face ID, impressão digital ou a credencial segura do aparelho para desbloquear o CVT Ponto ao abrir ou retornar ao aplicativo.</p>
+      <button className={biometricOn?"secondary securityButton":"primary securityButton"} onClick={toggleBiometric}>
+        {biometricOn?"DESATIVAR PROTEÇÃO":"ATIVAR PROTEÇÃO"}
+      </button>
+    </section>}
 
     <section className="panel">
       <p className="eyebrow">RESUMO</p>
